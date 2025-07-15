@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use regex::Regex;
 
 use crate::config::{Config, Script};
+use crate::ui_control::{apply_ui_blocks, parse_ui_blocks};
 
 pub fn build_all(config: &Config, out_dir: &Path) -> anyhow::Result<()> {
     fs::create_dir_all(out_dir)?;
@@ -47,6 +48,10 @@ fn build_script(script: &Script, config: &Config, out_dir: &Path) -> anyhow::Res
                 src_path.display()
             );
         }
+
+        // UI Control
+        let ui_blocks = parse_ui_blocks(&content);
+        let content = apply_ui_blocks(&content, &ui_blocks);
 
         combined.push_str(&content);
         combined.push_str("\n");

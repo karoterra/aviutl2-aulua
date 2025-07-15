@@ -1,0 +1,8 @@
+* text=auto
+
+*.lua text linguist-language=Lua
+*.obj2 text linguist-language=Lua
+*.anm2 text linguist-language=Lua
+*.scn2 text linguist-language=Lua
+*.cam2 text linguist-language=Lua
+*.tra2 text linguist-language=Lua

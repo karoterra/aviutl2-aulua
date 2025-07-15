@@ -1,2 +1,11 @@
 /target
 .vscode/
+
+# 動作確認用の設定ファイル
+aulua.yaml
+# 動作確認用のスクリプトソース
+script/
+# スクリプトのビルド出力先
+build/
+# テスト時のビルド出力先
+tests/temp_build/

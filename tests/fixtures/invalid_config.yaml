@@ -1,0 +1,6 @@
+project:
+  variables:
+    VERSION: v1.0.0
+    AUTHOR: karoterra
+
+scripts: "配列ではなく文字列を指定"

@@ -1,0 +1,5 @@
+scripts:
+  - name : test_output.obj2
+    sources:
+      - path: tests/fixtures/script1.obj2
+        label: スクリプト1

@@ -1,0 +1,11 @@
+project:
+  variables:
+    VERSION: v1.0.0
+    AUTHOR: karoterra
+
+scripts:
+  - name: test_script.obj2
+    sources:
+      - path: script/test_script.obj2
+        variables:
+          INFO: 説明

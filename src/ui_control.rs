@@ -1,3 +1,5 @@
+use std::iter::Peekable;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UiControlKind {
     Select,
@@ -13,7 +15,11 @@ pub enum UiControlKind {
 #[derive(Debug, Clone, PartialEq)]
 pub enum UiControlMeta {
     Select(Vec<(String, String)>),
-    Track { min: f32, max: f32, step: f32 },
+    Track {
+        min: String,
+        max: String,
+        step: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -34,58 +40,201 @@ pub fn parse_ui_blocks(source: &str) -> Vec<UiControlBlock> {
     while let Some((i, line)) = lines.next() {
         let line = line.trim();
         if let Some(label) = line.strip_prefix("---$select:") {
-            // select block
-            let mut options = Vec::new();
-            let mut default_value = None;
-            let mut var_name = None;
-            let start_line = i;
-            let mut end_line = i;
-
-            let label = label.trim().to_string();
-
-            while let Some(&(j, next_line)) = lines.peek() {
-                let next_line = next_line.trim();
-                if let Some(opt) = next_line.strip_prefix("---") {
-                    if let Some((name, value)) = opt.split_once('=') {
-                        options.push((name.trim().to_string(), value.trim().to_string()));
-                    }
-                    lines.next();
-                } else if next_line.starts_with("local ") && next_line.contains('=') {
-                    let assignment = next_line.trim_start_matches("local ").trim();
-                    if let Some((name, value)) = assignment.split_once('=') {
-                        var_name = Some(name.trim().to_string());
-                        default_value = Some(value.trim().to_string());
-                        lines.next();
-                        if let Some(&(k, line_after_block)) = lines.peek() {
-                            if line_after_block.len() == 0 {
-                                end_line = k;
-                            } else {
-                                end_line = j;
-                            }
-                        } else {
-                            end_line = j;
-                        }
-                        break;
-                    }
-                } else {
-                    break;
-                }
+            if let Some(block) = parse_select_block(i, label, &mut lines) {
+                blocks.push(block);
             }
-
-            if let (Some(var), Some(def)) = (var_name, default_value) {
-                blocks.push(UiControlBlock {
-                    kind: UiControlKind::Select,
-                    label: label,
-                    var_name: var,
-                    default_value: def,
-                    start_line: start_line,
-                    end_line: end_line,
-                    meta: Some(UiControlMeta::Select(options)),
-                });
+        } else if let Some(label) = line.strip_prefix("---$track:") {
+            if let Some(block) = parse_track_block(i, label, &mut lines) {
+                blocks.push(block);
+            }
+        } else if let Some(label) = line.strip_prefix("---$check:") {
+            if let Some(block) = parse_ui_block_no_meta(UiControlKind::Check, i, label, &mut lines)
+            {
+                blocks.push(block);
+            }
+        } else if let Some(label) = line.strip_prefix("---$color:") {
+            if let Some(block) = parse_ui_block_no_meta(UiControlKind::Color, i, label, &mut lines)
+            {
+                blocks.push(block);
+            }
+        } else if let Some(label) = line.strip_prefix("---$file:") {
+            if let Some(block) = parse_file_block(i, label, &mut lines) {
+                blocks.push(block);
+            }
+        } else if let Some(label) = line.strip_prefix("---$font:") {
+            if let Some(block) = parse_ui_block_no_meta(UiControlKind::Font, i, label, &mut lines) {
+                blocks.push(block);
+            }
+        } else if let Some(label) = line.strip_prefix("---$figure:") {
+            if let Some(block) = parse_ui_block_no_meta(UiControlKind::Figure, i, label, &mut lines)
+            {
+                blocks.push(block);
+            }
+        } else if let Some(label) = line.strip_prefix("---$value:") {
+            if let Some(block) = parse_ui_block_no_meta(UiControlKind::Value, i, label, &mut lines)
+            {
+                blocks.push(block);
             }
         }
     }
     blocks
+}
+
+fn parse_assignment<'a, I>(
+    line: &'a str,
+    lines: &mut Peekable<I>,
+) -> Option<(String, String, usize)>
+where
+    I: Iterator<Item = (usize, &'a str)>,
+{
+    if line.starts_with("local ") && line.contains('=') {
+        let assignment = line.trim_start_matches("local ").trim();
+        if let Some((name, value)) = assignment.split_once('=') {
+            let var_name = name.trim().to_string();
+            let default_value = value.trim().to_string();
+            lines.next();
+            let end_line: usize = if let Some(&(_, next_line)) = lines.peek() {
+                if next_line.len() == 0 { 1 } else { 0 }
+            } else {
+                0
+            };
+            return Some((var_name, default_value, end_line));
+        }
+    }
+    None
+}
+
+fn parse_select_block<'a, I>(
+    start_line: usize,
+    label: &'a str,
+    lines: &mut Peekable<I>,
+) -> Option<UiControlBlock>
+where
+    I: Iterator<Item = (usize, &'a str)>,
+{
+    let mut options = Vec::new();
+
+    while let Some(&(i, line)) = lines.peek() {
+        let line = line.trim();
+        if let Some(opt) = line.strip_prefix("---") {
+            if let Some((name, value)) = opt.split_once('=') {
+                options.push((name.trim().to_string(), value.trim().to_string()));
+            }
+            lines.next();
+        } else if let Some((name, value, end_offset)) = parse_assignment(line, lines) {
+            return Some(UiControlBlock {
+                kind: UiControlKind::Select,
+                label: label.trim().to_string(),
+                var_name: name,
+                default_value: value,
+                start_line: start_line,
+                end_line: i + end_offset,
+                meta: Some(UiControlMeta::Select(options)),
+            });
+        } else {
+            break;
+        }
+    }
+    None
+}
+
+fn parse_track_block<'a, I>(
+    start_line: usize,
+    label: &'a str,
+    lines: &mut Peekable<I>,
+) -> Option<UiControlBlock>
+where
+    I: Iterator<Item = (usize, &'a str)>,
+{
+    let mut min_value = "0".to_string();
+    let mut max_value = "100".to_string();
+    let mut step = None;
+
+    while let Some(&(i, line)) = lines.peek() {
+        let line = line.trim();
+        if let Some(value) = line.strip_prefix("---min=") {
+            min_value = value.trim().to_string();
+            lines.next();
+        } else if let Some(value) = line.strip_prefix("---max=") {
+            max_value = value.trim().to_string();
+            lines.next();
+        } else if let Some(value) = line.strip_prefix("---step=") {
+            step = Some(value.trim().to_string());
+            lines.next();
+        } else if line.starts_with("--") {
+            lines.next();
+        } else if let Some((name, value, end_offset)) = parse_assignment(line, lines) {
+            return Some(UiControlBlock {
+                kind: UiControlKind::Track,
+                label: label.trim().to_string(),
+                var_name: name,
+                default_value: value,
+                start_line: start_line,
+                end_line: i + end_offset,
+                meta: Some(UiControlMeta::Track {
+                    min: min_value,
+                    max: max_value,
+                    step: step,
+                }),
+            });
+        } else {
+            break;
+        }
+    }
+    None
+}
+
+fn parse_ui_block_no_meta<'a, I>(
+    kind: UiControlKind,
+    start_line: usize,
+    label: &'a str,
+    lines: &mut Peekable<I>,
+) -> Option<UiControlBlock>
+where
+    I: Iterator<Item = (usize, &'a str)>,
+{
+    while let Some(&(i, line)) = lines.peek() {
+        let line = line.trim();
+        if line.starts_with("--") {
+            lines.next();
+        } else if let Some((name, value, end_offset)) = parse_assignment(line, lines) {
+            return Some(UiControlBlock {
+                kind: kind,
+                label: label.trim().to_string(),
+                var_name: name,
+                default_value: value,
+                start_line: start_line,
+                end_line: i + end_offset,
+                meta: None,
+            });
+        }
+    }
+    None
+}
+
+fn parse_file_block<'a, I>(
+    start_line: usize,
+    label: &'a str,
+    lines: &mut Peekable<I>,
+) -> Option<UiControlBlock>
+where
+    I: Iterator<Item = (usize, &'a str)>,
+{
+    if let Some(&(i, line)) = lines.peek() {
+        let line = line.trim();
+        if let Some((name, value, end_offset)) = parse_assignment(line, lines) {
+            return Some(UiControlBlock {
+                kind: UiControlKind::File,
+                label: label.trim().to_string(),
+                var_name: name,
+                default_value: value,
+                start_line: start_line,
+                end_line: i + end_offset,
+                meta: None,
+            });
+        }
+    }
+    None
 }
 
 pub fn apply_ui_blocks(source: &str, blocks: &[UiControlBlock]) -> String {
@@ -105,7 +254,53 @@ pub fn apply_ui_blocks(source: &str, blocks: &[UiControlBlock]) -> String {
                 }
                 line
             }
-            _ => continue,
+            UiControlKind::Track => {
+                let mut line = format!("--track@{}:{}", block.var_name, block.label);
+                if let Some(UiControlMeta::Track { min, max, step }) = &block.meta {
+                    line.push_str(&format!(",{},{},{}", min, max, block.default_value));
+                    if let Some(step) = step {
+                        line.push_str(&format!(",{}", step));
+                    }
+                }
+                line
+            }
+            UiControlKind::Check => {
+                format!(
+                    "--check@{}:{},{}",
+                    block.var_name, block.label, block.default_value
+                )
+            }
+            UiControlKind::Color => {
+                format!(
+                    "--color@{}:{},{}",
+                    block.var_name, block.label, block.default_value
+                )
+            }
+            UiControlKind::File => {
+                format!("--file@{}:{}", block.var_name, block.label)
+            }
+            UiControlKind::Font => {
+                format!(
+                    "--font@{}:{},{}",
+                    block.var_name,
+                    block.label,
+                    block.default_value.trim_matches('"')
+                )
+            }
+            UiControlKind::Figure => {
+                format!(
+                    "--figure@{}:{},{}",
+                    block.var_name,
+                    block.label,
+                    block.default_value.trim_matches('"')
+                )
+            }
+            UiControlKind::Value => {
+                format!(
+                    "--value@{}:{},{}",
+                    block.var_name, block.label, block.default_value
+                )
+            }
         };
 
         lines.splice(block.start_line..=block.end_line, [result]);

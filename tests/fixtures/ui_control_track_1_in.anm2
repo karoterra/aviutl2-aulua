@@ -1,0 +1,4 @@
+---$track:X速度
+---min=-10
+---max=10
+local vx = 0

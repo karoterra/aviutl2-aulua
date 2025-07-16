@@ -1,0 +1,3 @@
+---$value:数値
+---@type number|nil
+local num = 0

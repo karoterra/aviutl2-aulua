@@ -16,7 +16,8 @@ fn test_basic_build() {
 
     let result = fs::read_to_string(output_file).unwrap();
     let expect = r#"@スクリプト1
-print("hello from script1)
+print("hello from script1")
+
 "#;
     assert_eq!(result, expect);
 }

@@ -10,9 +10,10 @@ trim_trailing_whitespace = true
 indent_style = space
 indent_size = 4
 
-[*.lua]
+[*.{lua,obj2,anm2,scn2,cam2,tra2}]
 indent_style = space
 indent_size = 4
+insert_final_newline = false
 
 [*.yaml]
 indent_style = space

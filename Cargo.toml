@@ -3,6 +3,8 @@ name = "aulua"
 version = "0.1.0"
 edition = "2024"
 description = "AviUtl2 Lua script build & install tool"
+repository = "https://github.com/karoterra/aviutl2-aulua"
+license = "MIT"
 
 [dependencies]
 anyhow = "1.0.98"

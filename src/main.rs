@@ -1,6 +1,3 @@
-use std::env;
-use std::path::{Path, PathBuf};
-
 use clap::{Parser, Subcommand};
 
 use aulua::build::build_all;
@@ -32,17 +29,17 @@ fn main() {
     match cli.command {
         Commands::Build => {
             let config = load_config("aulua.yaml").expect("設定ファイルの読み込みに失敗しました");
-            build_all(&config, Path::new("build")).expect("ビルド処理に失敗しました");
+            build_all(&config, &config.build_out_dir()).expect("ビルド処理に失敗しました");
         }
         Commands::Install { dry_run } => {
             let config = load_config("aulua.yaml").expect("設定ファイルの読み込みに失敗しました");
-            let program_data_dir =
-                env::var("PROGRAMDATA").expect("PROGRAMDATAが設定されていません");
-            let out_dir = PathBuf::from(program_data_dir)
-                .join("aviutl2")
-                .join("Script");
-            install_all(&config, Path::new("build"), &out_dir, dry_run)
-                .expect("インストールに失敗しました");
+            install_all(
+                &config,
+                &config.build_out_dir(),
+                &config.install_out_dir(),
+                dry_run,
+            )
+            .expect("インストールに失敗しました");
         }
     }
 }

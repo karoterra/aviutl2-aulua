@@ -51,6 +51,8 @@ mod tests {
 
         let config = Config {
             project: None,
+            build: None,
+            install: None,
             scripts: vec![Script {
                 name: script_name.to_string(),
                 sources: vec![],

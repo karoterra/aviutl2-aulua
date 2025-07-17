@@ -1,17 +1,54 @@
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 /// 全体の設定ファイル構造
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub project: Option<Project>,
+    pub build: Option<Build>,
+    pub install: Option<Install>,
     pub scripts: Vec<Script>,
+}
+
+impl Config {
+    pub fn build_out_dir(&self) -> PathBuf {
+        self.build
+            .as_ref()
+            .and_then(|b| b.out_dir.as_ref())
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("build"))
+    }
+
+    pub fn install_out_dir(&self) -> PathBuf {
+        self.install
+            .as_ref()
+            .and_then(|i| i.out_dir.as_ref())
+            .map(PathBuf::from)
+            .unwrap_or_else(|| {
+                let program_data =
+                    std::env::var("PROGRAMDATA").unwrap_or_else(|_| "C:\\ProgramData".to_string());
+                PathBuf::from(program_data).join("aviutl2").join("Script")
+            })
+    }
 }
 
 /// `project` セクション
 #[derive(Debug, Deserialize)]
 pub struct Project {
     pub variables: Option<HashMap<String, String>>,
+}
+
+/// `build` セクション
+#[derive(Debug, Deserialize)]
+pub struct Build {
+    pub out_dir: Option<String>,
+}
+
+/// `install` セクション
+#[derive(Debug, Deserialize)]
+pub struct Install {
+    pub out_dir: Option<String>,
 }
 
 /// 各出力スクリプト単位の設定

@@ -5,7 +5,7 @@ use aulua::config_loader::load_config;
 use aulua::install::install_all;
 
 #[derive(Parser)]
-#[command(about)]
+#[command(version, about, long_about = None)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,

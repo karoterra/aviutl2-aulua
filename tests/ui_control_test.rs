@@ -1,16 +1,10 @@
-use std::fs;
-use std::path::PathBuf;
+mod common;
 
 use rstest::rstest;
 
 use aulua::ui_control::{apply_ui_blocks, parse_ui_blocks};
 
-fn read_fixture(file: &str) -> String {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures")
-        .join(file);
-    fs::read_to_string(&path).expect(&format!("failed to read: {:?}", &path))
-}
+use common::read_fixture;
 
 #[rstest]
 #[case::select_1("ui_control_select_1_in.anm2", "ui_control_select_1_out.anm2")]

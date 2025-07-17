@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use regex::Regex;
 
 use crate::config::{Config, Script};
+use crate::include::process_includes;
 use crate::ui_control::{apply_ui_blocks, parse_ui_blocks};
 
 pub fn build_all(config: &Config, out_dir: &Path) -> anyhow::Result<()> {
@@ -30,6 +31,15 @@ fn build_script(script: &Script, config: &Config, out_dir: &Path) -> anyhow::Res
         if let Some(label) = &source.label {
             combined.push_str(&format!("@{}\n", label));
         }
+
+        // ファイルインクルード
+        let mut visited = HashSet::new();
+        let content = process_includes(
+            &content,
+            src_path.parent().unwrap_or(Path::new("")),
+            &mut visited,
+        )
+        .map_err(|e| anyhow::anyhow!("{}", e))?;
 
         // 変数
         let mut vars = HashMap::new();

@@ -313,15 +313,10 @@ pub fn apply_ui_blocks(source: &str, blocks: &[UiControlBlock]) -> String {
 mod tests {
     use super::*;
     use rstest::rstest;
-    use std::fs;
-    use std::path::PathBuf;
 
-    fn read_fixture(file: &str) -> String {
-        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/fixtures")
-            .join(file);
-        fs::read_to_string(&path).expect(&format!("failed to read: {:?}", &path))
-    }
+    #[path = "../../../tests/common/mod.rs"]
+    mod common;
+    use common::read_fixture;
 
     #[test]
     fn test_parse_ui_blocks_select() {

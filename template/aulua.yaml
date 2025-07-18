@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/karoterra/aviutl2-aulua/refs/heads/main/schema/aulua.schema.json
+project:
+  variables:
+    VERSION: v0.1.0
+    AUTHOR: your name
+
+build:
+  out_dir: build
+
+install:
+  out_dir: C:\ProgramData\aviutl2\Script
+
+scripts:
+  - name: SampleAnimationEffect.anm2
+    sources:
+      - path: script/SampleAnimationEffect.anm2
+        variables:
+          INFO: これはテンプレートです

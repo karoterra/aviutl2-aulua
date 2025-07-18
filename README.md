@@ -2,6 +2,8 @@
 
 **AviUtl2 Lua script build & install tool**
 
+[![CI](https://github.com/karoterra/aviutl2-aulua/actions/workflows/ci.yaml/badge.svg)](https://github.com/karoterra/aviutl2-aulua/actions/workflows/ci.yaml)
+
 `aulua` は、AviUtl2 用の Lua スクリプトのビルドやインストールを支援する CLI ツールです。
 
 ## 機能概要

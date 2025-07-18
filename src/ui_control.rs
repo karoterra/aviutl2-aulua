@@ -94,7 +94,7 @@ where
             let default_value = value.trim().to_string();
             lines.next();
             let end_line: usize = if let Some(&(_, next_line)) = lines.peek() {
-                if next_line.len() == 0 { 1 } else { 0 }
+                if next_line.is_empty() { 1 } else { 0 }
             } else {
                 0
             };
@@ -127,7 +127,7 @@ where
                 label: label.trim().to_string(),
                 var_name: name,
                 default_value: value,
-                start_line: start_line,
+                start_line,
                 end_line: i + end_offset,
                 meta: Some(UiControlMeta::Select(options)),
             });
@@ -169,12 +169,12 @@ where
                 label: label.trim().to_string(),
                 var_name: name,
                 default_value: value,
-                start_line: start_line,
+                start_line,
                 end_line: i + end_offset,
                 meta: Some(UiControlMeta::Track {
                     min: min_value,
                     max: max_value,
-                    step: step,
+                    step,
                 }),
             });
         } else {
@@ -199,11 +199,11 @@ where
             lines.next();
         } else if let Some((name, value, end_offset)) = parse_assignment(line, lines) {
             return Some(UiControlBlock {
-                kind: kind,
+                kind,
                 label: label.trim().to_string(),
                 var_name: name,
                 default_value: value,
-                start_line: start_line,
+                start_line,
                 end_line: i + end_offset,
                 meta: None,
             });
@@ -228,7 +228,7 @@ where
                 label: label.trim().to_string(),
                 var_name: name,
                 default_value: value,
-                start_line: start_line,
+                start_line,
                 end_line: i + end_offset,
                 meta: None,
             });
@@ -249,7 +249,7 @@ pub fn apply_ui_blocks(source: &str, blocks: &[UiControlBlock]) -> String {
                 );
                 if let Some(UiControlMeta::Select(opts)) = &block.meta {
                     for (name, val) in opts {
-                        line.push_str(&format!(",{}={}", name, val));
+                        line.push_str(&format!(",{name}={val}"));
                     }
                 }
                 line
@@ -259,7 +259,7 @@ pub fn apply_ui_blocks(source: &str, blocks: &[UiControlBlock]) -> String {
                 if let Some(UiControlMeta::Track { min, max, step }) = &block.meta {
                     line.push_str(&format!(",{},{},{}", min, max, block.default_value));
                     if let Some(step) = step {
-                        line.push_str(&format!(",{}", step));
+                        line.push_str(&format!(",{step}"));
                     }
                 }
                 line
@@ -314,9 +314,7 @@ mod tests {
     use super::*;
     use rstest::rstest;
 
-    #[path = "../../../tests/common/mod.rs"]
-    mod common;
-    use common::read_fixture;
+    use crate::common::read_fixture;
 
     #[test]
     fn test_parse_ui_blocks_select() {

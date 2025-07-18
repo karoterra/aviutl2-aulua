@@ -1,5 +1,6 @@
 use aulua::build::build_all;
 use aulua::config_loader::load_config;
+use aulua::text_utils::read_text;
 use std::fs;
 use std::path::Path;
 
@@ -14,7 +15,7 @@ fn test_basic_build() {
 
     build_all(&config, out_dir).unwrap();
 
-    let result = fs::read_to_string(output_file).unwrap();
+    let result = read_text(&output_file).unwrap();
     let expect = r#"@スクリプト1
 print("hello from script1")
 

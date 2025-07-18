@@ -1,9 +1,10 @@
+use schemars::JsonSchema;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// 全体の設定ファイル構造
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, JsonSchema)]
 pub struct Config {
     pub project: Option<Project>,
     pub build: Option<Build>,
@@ -34,32 +35,32 @@ impl Config {
 }
 
 /// `project` セクション
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, JsonSchema)]
 pub struct Project {
     pub variables: Option<HashMap<String, String>>,
 }
 
 /// `build` セクション
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, JsonSchema)]
 pub struct Build {
     pub out_dir: Option<String>,
 }
 
 /// `install` セクション
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, JsonSchema)]
 pub struct Install {
     pub out_dir: Option<String>,
 }
 
 /// 各出力スクリプト単位の設定
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, JsonSchema)]
 pub struct Script {
     pub name: String,
     pub sources: Vec<ScriptSource>,
 }
 
 /// 各スクリプトソースの設定
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, JsonSchema)]
 pub struct ScriptSource {
     pub path: String,
     pub label: Option<String>,

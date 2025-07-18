@@ -32,3 +32,9 @@ jobs:
 
       - name: Test
         run: cargo test --workspace
+
+      - name: Check if generated schema matches committed file
+        run: |
+          mkdir tmp
+          cargo run --release -- schema -o ./tmp/aulua.schema.json
+          git diff --no-index --exit-code ./schema/aulua.schema.json ./tmp/aulua.schema.json

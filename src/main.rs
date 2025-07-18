@@ -1,8 +1,11 @@
+use std::path::PathBuf;
+
 use clap::{Parser, Subcommand};
 
 use aulua::build::build_all;
 use aulua::config_loader::load_config;
 use aulua::install::install_all;
+use aulua::schema::generate_config_schema;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -20,6 +23,12 @@ enum Commands {
         /// ファイルはコピーせず、処理内容だけ表示する
         #[arg(long)]
         dry_run: bool,
+    },
+    /// スキーマファイルを生成する
+    Schema {
+        /// 出力先ファイルのパスを指定する
+        #[arg(short, long, value_name = "file", default_value = "aulua.schema.json")]
+        output: PathBuf,
     },
 }
 
@@ -40,6 +49,9 @@ fn main() {
                 dry_run,
             )
             .expect("インストールに失敗しました");
+        }
+        Commands::Schema { output } => {
+            generate_config_schema(&output).expect("スキーマ生成に失敗しました");
         }
     }
 }

@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Config",
+  "description": "全体の設定ファイル構造",
+  "type": "object",
+  "properties": {
+    "build": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Build"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "install": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Install"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "project": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Project"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "scripts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Script"
+      }
+    }
+  },
+  "required": [
+    "scripts"
+  ],
+  "$defs": {
+    "Build": {
+      "description": "`build` セクション",
+      "type": "object",
+      "properties": {
+        "out_dir": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "Install": {
+      "description": "`install` セクション",
+      "type": "object",
+      "properties": {
+        "out_dir": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "Project": {
+      "description": "`project` セクション",
+      "type": "object",
+      "properties": {
+        "variables": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "Script": {
+      "description": "各出力スクリプト単位の設定",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ScriptSource"
+          }
+        }
+      },
+      "required": [
+        "name",
+        "sources"
+      ]
+    },
+    "ScriptSource": {
+      "description": "各スクリプトソースの設定",
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "variables": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "path"
+      ]
+    }
+  }
+}

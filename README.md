@@ -66,6 +66,10 @@ aulua build
 aulua install
 ```
 
+### init
+
+`aulua init <dir>` を実行すると指定したフォルダに `aulua.yaml` などいくつかのテンプレートを作成します。
+
 ### ビルド
 
 `sources` で `label` を指定すると@ラベルを付与します。
@@ -196,6 +200,11 @@ local table = {0,0,0}
 ```bash
 aulua install --dry-run
 ```
+
+### 設定ファイルスキーマ
+
+`aulua.yaml` のスキーマは `aulua schema` コマンドでJSONスキーマとして出力することができます。
+また[こちらのURL](https://raw.githubusercontent.com/karoterra/aviutl2-aulua/refs/heads/main/schema/aulua.schema.json)からも参照可能です。
 
 ## ライセンス
 

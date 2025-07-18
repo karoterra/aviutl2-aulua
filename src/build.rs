@@ -6,6 +6,7 @@ use regex::Regex;
 
 use crate::config::{Config, Script};
 use crate::include::process_includes;
+use crate::text_utils::read_text;
 use crate::ui_control::{apply_ui_blocks, parse_ui_blocks};
 
 pub fn build_all(config: &Config, out_dir: &Path) -> anyhow::Result<()> {
@@ -23,7 +24,7 @@ fn build_script(script: &Script, config: &Config, out_dir: &Path) -> anyhow::Res
 
     for source in &script.sources {
         let src_path = PathBuf::from(&source.path);
-        let content = fs::read_to_string(&src_path).map_err(|e| {
+        let content = read_text(&src_path).map_err(|e| {
             anyhow::anyhow!("{} の読み込みに失敗しました: {}", src_path.display(), e)
         })?;
 

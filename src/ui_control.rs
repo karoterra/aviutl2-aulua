@@ -314,7 +314,7 @@ mod tests {
     use super::*;
     use rstest::rstest;
 
-    use crate::common::read_fixture;
+    use crate::{common::get_fixture_path, text_utils::read_text};
 
     #[test]
     fn test_parse_ui_blocks_select() {
@@ -358,7 +358,8 @@ local eye = 1
         #[case] start_line: usize,
         #[case] end_line: usize,
     ) {
-        let input = read_fixture(input_file);
+        let input_path = get_fixture_path(input_file);
+        let input = read_text(&input_path).unwrap();
         let blocks = parse_ui_blocks(&input);
 
         assert_eq!(blocks.len(), 1);

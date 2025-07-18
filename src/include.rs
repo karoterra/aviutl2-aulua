@@ -2,6 +2,8 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::text_utils::read_text;
+
 pub fn process_includes(
     content: &str,
     base_dir: &Path,
@@ -34,7 +36,7 @@ pub fn process_includes(
 
                 visited.insert(canonical.clone());
 
-                let include_content = fs::read_to_string(&canonical).map_err(|e| {
+                let include_content = read_text(&canonical).map_err(|e| {
                     format!(
                         "Failed to read included file {}: {}",
                         canonical.display(),
@@ -68,12 +70,14 @@ mod tests {
 
     use std::path::PathBuf;
 
-    use crate::common::read_fixture;
+    use crate::common::get_fixture_path;
 
     #[test]
     fn test_nested_includes() {
-        let input = read_fixture("include_main.lua");
-        let expected = read_fixture("include_main_out.lua");
+        let input_path = get_fixture_path("include_main.lua");
+        let input = read_text(&input_path).unwrap();
+        let expected_path = get_fixture_path("include_main_out.lua");
+        let expected = read_text(&expected_path).unwrap();
 
         let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
         let mut visited = HashSet::new();
@@ -87,7 +91,8 @@ mod tests {
 
     #[test]
     fn test_cycle_includes() {
-        let input = read_fixture("include_cycle_a.lua");
+        let input_path = get_fixture_path("include_cycle_a.lua");
+        let input = read_text(&input_path).unwrap();
 
         let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
         let mut visited = HashSet::new();

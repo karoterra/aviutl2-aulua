@@ -2,9 +2,12 @@ mod common;
 
 use rstest::rstest;
 
-use aulua::ui_control::{apply_ui_blocks, parse_ui_blocks};
+use aulua::{
+    text_utils::read_text,
+    ui_control::{apply_ui_blocks, parse_ui_blocks},
+};
 
-use common::read_fixture;
+use common::get_fixture_path;
 
 #[rstest]
 #[case::select_1("ui_control_select_1_in.anm2", "ui_control_select_1_out.anm2")]
@@ -29,8 +32,10 @@ use common::read_fixture;
     "ui_control_value_table_1_out.anm2"
 )]
 fn test_parse_apply(#[case] input_file: &str, #[case] expected_file: &str) {
-    let input = read_fixture(input_file);
-    let expected = read_fixture(expected_file);
+    let input_path = get_fixture_path(input_file);
+    let input = read_text(&input_path).unwrap();
+    let expected_path = get_fixture_path(expected_file);
+    let expected = read_text(&expected_path).unwrap();
     let blocks = parse_ui_blocks(&input);
     let output = apply_ui_blocks(&input, &blocks);
     assert_eq!(output, expected);

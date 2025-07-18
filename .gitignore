@@ -2,7 +2,7 @@
 .vscode/
 
 # 動作確認用の設定ファイル
-aulua.yaml
+/aulua.yaml
 # 動作確認用のスクリプトソース
 script/
 # スクリプトのビルド出力先

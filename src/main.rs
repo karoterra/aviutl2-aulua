@@ -4,6 +4,7 @@ use clap::{Parser, Subcommand};
 
 use aulua::build::build_all;
 use aulua::config_loader::load_config;
+use aulua::init::init_project;
 use aulua::install::install_all;
 use aulua::schema::generate_config_schema;
 
@@ -23,6 +24,12 @@ enum Commands {
         /// ファイルはコピーせず、処理内容だけ表示する
         #[arg(long)]
         dry_run: bool,
+    },
+    /// auluaプロジェクトを作成する
+    Init {
+        /// プロジェクトを作成するフォルダを指定する
+        #[arg(value_name = "dir", default_value = ".")]
+        dir: PathBuf,
     },
     /// スキーマファイルを生成する
     Schema {
@@ -49,6 +56,9 @@ fn main() {
                 dry_run,
             )
             .expect("インストールに失敗しました");
+        }
+        Commands::Init { dir } => {
+            init_project(&dir).expect("プロジェクトの初期化に失敗しました");
         }
         Commands::Schema { output } => {
             generate_config_schema(&output).expect("スキーマ生成に失敗しました");

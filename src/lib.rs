@@ -2,6 +2,7 @@ pub mod build;
 pub mod config;
 pub mod config_loader;
 pub mod include;
+pub mod init;
 pub mod install;
 pub mod schema;
 pub mod text_utils;

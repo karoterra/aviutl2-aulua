@@ -29,7 +29,7 @@ fn build_script(script: &Script, config: &Config, out_dir: &Path) -> anyhow::Res
 
         // ラベル
         if let Some(label) = &source.label {
-            combined.push_str(&format!("@{}\n", label));
+            combined.push_str(&format!("@{label}\n"));
         }
 
         // ファイルインクルード
@@ -64,7 +64,7 @@ fn build_script(script: &Script, config: &Config, out_dir: &Path) -> anyhow::Res
         let content = apply_ui_blocks(&content, &ui_blocks);
 
         combined.push_str(&content);
-        combined.push_str("\n");
+        combined.push('\n');
     }
 
     let out_path = out_dir.join(&script.name);

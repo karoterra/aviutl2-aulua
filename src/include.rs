@@ -68,9 +68,7 @@ mod tests {
 
     use std::path::PathBuf;
 
-    #[path = "../../../tests/common/mod.rs"]
-    mod common;
-    use common::read_fixture;
+    use crate::common::read_fixture;
 
     #[test]
     fn test_nested_includes() {
@@ -83,7 +81,7 @@ mod tests {
         let result = process_includes(&input, &base_dir, &mut visited);
         match result {
             Ok(output) => assert_eq!(output, expected),
-            Err(e) => panic!("Unexpected error: {}", e),
+            Err(e) => panic!("Unexpected error: {e}"),
         }
     }
 

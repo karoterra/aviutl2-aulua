@@ -39,42 +39,38 @@ pub fn parse_ui_blocks(source: &str) -> Vec<UiControlBlock> {
 
     while let Some((i, line)) = lines.next() {
         let line = line.trim();
-        if let Some(label) = line.strip_prefix("---$select:") {
-            if let Some(block) = parse_select_block(i, label, &mut lines) {
-                blocks.push(block);
-            }
-        } else if let Some(label) = line.strip_prefix("---$track:") {
-            if let Some(block) = parse_track_block(i, label, &mut lines) {
-                blocks.push(block);
-            }
-        } else if let Some(label) = line.strip_prefix("---$check:") {
-            if let Some(block) = parse_ui_block_no_meta(UiControlKind::Check, i, label, &mut lines)
-            {
-                blocks.push(block);
-            }
-        } else if let Some(label) = line.strip_prefix("---$color:") {
-            if let Some(block) = parse_ui_block_no_meta(UiControlKind::Color, i, label, &mut lines)
-            {
-                blocks.push(block);
-            }
-        } else if let Some(label) = line.strip_prefix("---$file:") {
-            if let Some(block) = parse_file_block(i, label, &mut lines) {
-                blocks.push(block);
-            }
-        } else if let Some(label) = line.strip_prefix("---$font:") {
-            if let Some(block) = parse_ui_block_no_meta(UiControlKind::Font, i, label, &mut lines) {
-                blocks.push(block);
-            }
-        } else if let Some(label) = line.strip_prefix("---$figure:") {
-            if let Some(block) = parse_ui_block_no_meta(UiControlKind::Figure, i, label, &mut lines)
-            {
-                blocks.push(block);
-            }
-        } else if let Some(label) = line.strip_prefix("---$value:") {
-            if let Some(block) = parse_ui_block_no_meta(UiControlKind::Value, i, label, &mut lines)
-            {
-                blocks.push(block);
-            }
+        if let Some(label) = line.strip_prefix("---$select:")
+            && let Some(block) = parse_select_block(i, label, &mut lines)
+        {
+            blocks.push(block);
+        } else if let Some(label) = line.strip_prefix("---$track:")
+            && let Some(block) = parse_track_block(i, label, &mut lines)
+        {
+            blocks.push(block);
+        } else if let Some(label) = line.strip_prefix("---$check:")
+            && let Some(block) = parse_ui_block_no_meta(UiControlKind::Check, i, label, &mut lines)
+        {
+            blocks.push(block);
+        } else if let Some(label) = line.strip_prefix("---$color:")
+            && let Some(block) = parse_ui_block_no_meta(UiControlKind::Color, i, label, &mut lines)
+        {
+            blocks.push(block);
+        } else if let Some(label) = line.strip_prefix("---$file:")
+            && let Some(block) = parse_file_block(i, label, &mut lines)
+        {
+            blocks.push(block);
+        } else if let Some(label) = line.strip_prefix("---$font:")
+            && let Some(block) = parse_ui_block_no_meta(UiControlKind::Font, i, label, &mut lines)
+        {
+            blocks.push(block);
+        } else if let Some(label) = line.strip_prefix("---$figure:")
+            && let Some(block) = parse_ui_block_no_meta(UiControlKind::Figure, i, label, &mut lines)
+        {
+            blocks.push(block);
+        } else if let Some(label) = line.strip_prefix("---$value:")
+            && let Some(block) = parse_ui_block_no_meta(UiControlKind::Value, i, label, &mut lines)
+        {
+            blocks.push(block);
         }
     }
     blocks

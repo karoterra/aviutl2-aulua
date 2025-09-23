@@ -24,6 +24,7 @@ use common::get_fixture_path;
 #[case::file_1("ui_control_file_1_in.anm2", "ui_control_file_1_out.anm2")]
 #[case::font_1("ui_control_font_1_in.anm2", "ui_control_font_1_out.anm2")]
 #[case::figure_1("ui_control_figure_1_in.anm2", "ui_control_figure_1_out.anm2")]
+#[case::text_1("ui_control_text_1_in.anm2", "ui_control_text_1_out.anm2")]
 #[case::value_num_1("ui_control_value_num_1_in.anm2", "ui_control_value_num_1_out.anm2")]
 #[case::value_num_2("ui_control_value_num_2_in.anm2", "ui_control_value_num_2_out.anm2")]
 #[case::value_text_1("ui_control_value_text_1_in.anm2", "ui_control_value_text_1_out.anm2")]

@@ -34,11 +34,11 @@ fn build_script(script: &Script, config: &Config, out_dir: &Path) -> anyhow::Res
         }
 
         // ファイルインクルード
-        let mut visited = HashSet::new();
+        let mut include_stack = Vec::new();
         let content = process_includes(
             &content,
             src_path.parent().unwrap_or(Path::new("")),
-            &mut visited,
+            &mut include_stack,
         )
         .map_err(|e| anyhow::anyhow!("{}", e))?;
 

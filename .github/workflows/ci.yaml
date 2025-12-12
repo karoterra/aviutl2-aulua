@@ -9,7 +9,12 @@ on:
 
 jobs:
   check:
-    runs-on: windows-latest
+    strategy:
+      matrix:
+        os:
+          - windows-latest
+          - ubuntu-latest
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout source code

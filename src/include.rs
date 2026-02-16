@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -7,7 +6,7 @@ use crate::text_utils::read_text;
 pub fn process_includes(
     content: &str,
     base_dir: &Path,
-    visited: &mut HashSet<PathBuf>,
+    stack: &mut Vec<PathBuf>,
 ) -> Result<String, String> {
     let mut result = Vec::new();
 
@@ -27,14 +26,14 @@ pub fn process_includes(
                     )
                 })?;
 
-                if visited.contains(&canonical) {
+                if stack.contains(&canonical) {
                     return Err(format!(
                         "Circular include detected: {}",
                         canonical.display()
                     ));
                 }
 
-                visited.insert(canonical.clone());
+                stack.push(canonical.clone());
 
                 let include_content = read_text(&canonical).map_err(|e| {
                     format!(
@@ -47,8 +46,9 @@ pub fn process_includes(
                 let included_result = process_includes(
                     &include_content,
                     canonical.parent().unwrap_or(Path::new("")),
-                    visited,
+                    stack,
                 )?;
+                stack.pop();
                 result.push(included_result);
             } else {
                 return Err(format!(
@@ -80,9 +80,9 @@ mod tests {
         let expected = read_text(&expected_path).unwrap();
 
         let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
-        let mut visited = HashSet::new();
+        let mut stack = Vec::new();
 
-        let result = process_includes(&input, &base_dir, &mut visited);
+        let result = process_includes(&input, &base_dir, &mut stack);
         match result {
             Ok(output) => assert_eq!(output, expected),
             Err(e) => panic!("Unexpected error: {e}"),
@@ -95,12 +95,26 @@ mod tests {
         let input = read_text(&input_path).unwrap();
 
         let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
-        let mut visited = HashSet::new();
+        let mut stack = Vec::new();
 
-        let result = process_includes(&input, &base_dir, &mut visited);
+        let result = process_includes(&input, &base_dir, &mut stack);
 
         assert!(result.is_err());
         let error_message = result.unwrap_err();
         assert!(error_message.starts_with("Circular include detected"));
+    }
+
+    #[test]
+    fn test_duplicate_includes_allowed() {
+        let input_path = get_fixture_path("include_duplicate_main.lua");
+        let input = read_text(&input_path).unwrap();
+        let expected_path = get_fixture_path("include_duplicate_out.lua");
+        let expected = read_text(&expected_path).unwrap();
+
+        let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+        let mut stack = Vec::new();
+
+        let result = process_includes(&input, &base_dir, &mut stack).unwrap();
+        assert_eq!(result, expected);
     }
 }

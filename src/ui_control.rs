@@ -11,6 +11,7 @@ pub enum UiControlKind {
     Font,
     Figure,
     Text,
+    String,
     Value,
 }
 
@@ -75,6 +76,10 @@ pub fn parse_ui_blocks(source: &str) -> Vec<UiControlBlock> {
             blocks.push(block);
         } else if let Some(label) = line.strip_prefix("---$text:")
             && let Some(block) = parse_ui_block_no_meta(UiControlKind::Text, i, label, &mut lines)
+        {
+            blocks.push(block);
+        } else if let Some(label) = line.strip_prefix("---$string:")
+            && let Some(block) = parse_ui_block_no_meta(UiControlKind::String, i, label, &mut lines)
         {
             blocks.push(block);
         } else if let Some(label) = line.strip_prefix("---$value:")
@@ -307,6 +312,14 @@ pub fn apply_ui_blocks(source: &str, blocks: &[UiControlBlock]) -> String {
             UiControlKind::Text => {
                 format!(
                     "--text@{}:{},{}",
+                    block.var_name,
+                    block.label,
+                    block.default_value.trim_matches('"')
+                )
+            }
+            UiControlKind::String => {
+                format!(
+                    "--string@{}:{},{}",
                     block.var_name,
                     block.label,
                     block.default_value.trim_matches('"')

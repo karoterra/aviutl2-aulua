@@ -7,6 +7,7 @@ pub enum UiControlKind {
     Check,
     Color,
     File,
+    Folder,
     Font,
     Figure,
     Text,
@@ -58,6 +59,10 @@ pub fn parse_ui_blocks(source: &str) -> Vec<UiControlBlock> {
             blocks.push(block);
         } else if let Some(label) = line.strip_prefix("---$file:")
             && let Some(block) = parse_file_block(i, label, &mut lines)
+        {
+            blocks.push(block);
+        } else if let Some(label) = line.strip_prefix("---$folder:")
+            && let Some(block) = parse_ui_block_no_meta(UiControlKind::Folder, i, label, &mut lines)
         {
             blocks.push(block);
         } else if let Some(label) = line.strip_prefix("---$font:")
@@ -279,6 +284,9 @@ pub fn apply_ui_blocks(source: &str, blocks: &[UiControlBlock]) -> String {
             }
             UiControlKind::File => {
                 format!("--file@{}:{}", block.var_name, block.label)
+            }
+            UiControlKind::Folder => {
+                format!("--folder@{}:{}", block.var_name, block.label)
             }
             UiControlKind::Font => {
                 format!(

@@ -1,4 +1,4 @@
-name: Release Windows Binary
+name: Release Binaries
 
 on:
   push:
@@ -10,7 +10,12 @@ permissions:
 
 jobs:
   build:
-    runs-on: windows-latest
+    strategy:
+      matrix:
+        os:
+          - windows-latest
+          - ubuntu-latest
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout source code
@@ -28,7 +33,8 @@ jobs:
       - name: Generate NOTICE.html
         run: cargo about generate about.hbs -o NOTICE.html
 
-      - name: Prepare release files
+      - name: Prepare release files (Windows)
+        if: matrix.os == 'windows-latest'
         run: |
           mkdir release
           copy target/release/aulua.exe release/
@@ -36,12 +42,34 @@ jobs:
           copy LICENSE release/
           copy NOTICE.html release/
 
-      - name: Create zip archive
+      - name: Prepare release files (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          mkdir -p release
+          cp target/release/aulua release/
+          cp README.md release/
+          cp LICENSE release/
+          cp NOTICE.html release/
+
+      - name: Create zip archive (Windows)
+        if: matrix.os == 'windows-latest'
         run: |
           powershell Compress-Archive -Path release/* -DestinationPath aulua-${{ github.ref_name }}-windows.zip
 
-      - name: Create GitHub Release
+      - name: Create tar.gz archive (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: tar -czf aulua-${{ github.ref_name }}-linux.tar.gz -C release .
+
+      - name: Create GitHub Release (Windows)
+        if: matrix.os == 'windows-latest'
         uses: softprops/action-gh-release@v2
         with:
           files: aulua-${{ github.ref_name }}-windows.zip
+          generate_release_notes: true
+
+      - name: Create GitHub Release (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: aulua-${{ github.ref_name }}-linux.tar.gz
           generate_release_notes: true

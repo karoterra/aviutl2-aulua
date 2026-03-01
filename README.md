@@ -22,7 +22,7 @@
 ### Cargo でインストール
 
 ```bash
-cargo install --git https://github.com/karoterra/aviutl2-aulua
+cargo install aulua
 ```
 
 ## 使い方

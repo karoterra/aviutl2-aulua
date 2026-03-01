@@ -10,12 +10,24 @@ permissions:
 
 jobs:
   build:
+    name: Build (${{ matrix.name }})
     strategy:
+      fail-fast: false
       matrix:
-        os:
-          - windows-latest
-          - ubuntu-latest
+        include:
+          - name: Windows
+            os: windows-latest
+            ext: .exe
+            archive: aulua-${{ github.ref_name }}-windows.zip
+          - name: Linux
+            os: ubuntu-latest
+            ext: ''
+            archive: aulua-${{ github.ref_name }}-linux.tar.gz
+
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Checkout source code
@@ -33,43 +45,49 @@ jobs:
       - name: Generate NOTICE.html
         run: cargo about generate about.hbs -o NOTICE.html
 
-      - name: Prepare release files (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          mkdir release
-          copy target/release/aulua.exe release/
-          copy README.md release/
-          copy LICENSE release/
-          copy NOTICE.html release/
-
-      - name: Prepare release files (Linux)
-        if: matrix.os == 'ubuntu-latest'
+      - name: Prepare release files
         run: |
           mkdir -p release
-          cp target/release/aulua release/
+          cp target/release/aulua${{ matrix.ext }} release/
           cp README.md release/
           cp LICENSE release/
           cp NOTICE.html release/
 
       - name: Create zip archive (Windows)
         if: matrix.os == 'windows-latest'
+        shell: pwsh
         run: |
-          powershell Compress-Archive -Path release/* -DestinationPath aulua-${{ github.ref_name }}-windows.zip
+          Compress-Archive -Path release/* -DestinationPath ${{ matrix.archive }}
 
       - name: Create tar.gz archive (Linux)
         if: matrix.os == 'ubuntu-latest'
-        run: tar -czf aulua-${{ github.ref_name }}-linux.tar.gz -C release .
+        run: tar -czf ${{ matrix.archive }} -C release .
 
-      - name: Create GitHub Release (Windows)
-        if: matrix.os == 'windows-latest'
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-assets-${{ matrix.name }}
+          path: ${{ matrix.archive }}
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: release-assets-*
+          path: dist
+          merge-multiple: true
+
+      - name: List downloaded files
+        run: ls -la dist
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: aulua-${{ github.ref_name }}-windows.zip
-          generate_release_notes: true
-
-      - name: Create GitHub Release (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: aulua-${{ github.ref_name }}-linux.tar.gz
+          files: dist/*
           generate_release_notes: true

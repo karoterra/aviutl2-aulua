@@ -15,15 +15,26 @@
 
 ## インストール方法
 
-### Releases からダウンロード
+以下のいずれかの方法でインストールしてください。
 
-[Releases](https://github.com/karoterra/aviutl2-aulua/releases/) から最新版をダウンロードし、 `aulua.exe` を PATH の通った場所に配置する。
+### WinGet からインストール
+
+```
+winget install -e --id Karoterra.Aulua
+```
 
 ### Cargo でインストール
 
+Rust がインストールされている場合は Cargo からインストールできます。
+
 ```bash
-cargo install aulua
+cargo install --locked aulua
 ```
+
+### Releases からダウンロード
+
+[Releases](https://github.com/karoterra/aviutl2-aulua/releases/) から最新版をダウンロードし、 `aulua.exe` を PATH の通ったディレクトリに配置してください。
+
 
 ## 使い方
 

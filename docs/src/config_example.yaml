@@ -1,0 +1,32 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/karoterra/aviutl2-aulua/refs/heads/main/schema/aulua.schema.json
+
+project:
+  variables:
+    VERSION: v1.0.0
+    AUTHOR: karoterra
+
+build:
+  out_dir: build
+  embed_search_dirs:
+    - lib
+
+install:
+  out_dir: C:\ProgramData\aviutl2\Script\karoterra\
+
+scripts:
+  - name: 色覚シミュレーションKR.anm2
+    sources:
+      - path: script/色覚シミュレーションKR.in.anm2
+        variables:
+          INFO: 色覚シミュレーションKR for AviUtl2
+
+  - name: "@MyEffect.anm2"
+    sources:
+      - path: scripts/EffectA.in.anm2
+        label: EffectA
+        variables:
+          INFO: MyEffect (EffectA)
+      - path: scripts/EffectB.in.anm2
+        label: EffectB
+        variables:
+          INFO: MyEffect (EffectB)

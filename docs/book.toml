@@ -1,0 +1,9 @@
+[book]
+title = "aulua Documentation"
+description = ""
+authors = ["karoterra"]
+language = "ja"
+
+[output.html]
+git-repository-url = "https://github.com/karoterra/aviutl2-aulua"
+site-url = "/aviutl2-aulua/"

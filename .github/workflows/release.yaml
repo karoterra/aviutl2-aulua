@@ -18,11 +18,11 @@ jobs:
           - name: Windows
             os: windows-latest
             ext: .exe
-            archive: aulua-${{ github.ref_name }}-windows.zip
+            archive: aulua-${{ github.ref_name }}-windows-x64.zip
           - name: Linux
             os: ubuntu-latest
             ext: ''
-            archive: aulua-${{ github.ref_name }}-linux.tar.gz
+            archive: aulua-${{ github.ref_name }}-linux-x64.tar.gz
 
     runs-on: ${{ matrix.os }}
     defaults:

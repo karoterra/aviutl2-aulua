@@ -5,6 +5,7 @@ pub enum UiControlKind {
     Select,
     Track,
     Check,
+    CheckSection,
     Color,
     File,
     Folder,
@@ -52,6 +53,11 @@ pub fn parse_ui_blocks(source: &str) -> Vec<UiControlBlock> {
             blocks.push(block);
         } else if let Some(label) = line.strip_prefix("---$check:")
             && let Some(block) = parse_ui_block_no_meta(UiControlKind::Check, i, label, &mut lines)
+        {
+            blocks.push(block);
+        } else if let Some(label) = line.strip_prefix("---$checksection:")
+            && let Some(block) =
+                parse_ui_block_no_meta(UiControlKind::CheckSection, i, label, &mut lines)
         {
             blocks.push(block);
         } else if let Some(label) = line.strip_prefix("---$color:")
@@ -278,6 +284,12 @@ pub fn apply_ui_blocks(source: &str, blocks: &[UiControlBlock]) -> String {
             UiControlKind::Check => {
                 format!(
                     "--check@{}:{},{}",
+                    block.var_name, block.label, block.default_value
+                )
+            }
+            UiControlKind::CheckSection => {
+                format!(
+                    "--checksection@{}:{},{}",
                     block.var_name, block.label, block.default_value
                 )
             }

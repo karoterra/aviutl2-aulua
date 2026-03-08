@@ -49,6 +49,15 @@
       "description": "`build` セクション",
       "type": "object",
       "properties": {
+        "embed_search_dirs": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "out_dir": {
           "type": [
             "string",

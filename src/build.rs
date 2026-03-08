@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use regex::Regex;
 
 use crate::config::{Config, Script};
+use crate::embed::process_embeds;
 use crate::include::process_includes;
 use crate::text_utils::read_text;
 use crate::ui_control::{apply_ui_blocks, parse_ui_blocks};
@@ -41,6 +42,24 @@ fn build_script(script: &Script, config: &Config, out_dir: &Path) -> anyhow::Res
             &mut include_stack,
         )
         .map_err(|e| anyhow::anyhow!("{}", e))?;
+
+        // 埋め込み
+        let content = process_embeds(
+            &content,
+            src_path.parent().unwrap_or(Path::new("")),
+            &config
+                .build
+                .as_ref()
+                .map(|b| {
+                    b.embed_search_dirs
+                        .as_ref()
+                        .unwrap_or(&vec![])
+                        .iter()
+                        .map(PathBuf::from)
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default(),
+        )?;
 
         // 変数
         let mut vars = HashMap::new();

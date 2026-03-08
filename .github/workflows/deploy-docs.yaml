@@ -1,0 +1,56 @@
+name: Deploy to GitHub Pages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "deploy-to-gh-pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v6
+
+      - name: Install mdBook (prebuild)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag=$(gh release list -R rust-lang/mdBook --json tagName,isLatest -q '.[] | select(.isLatest == true) | .tagName')
+          archive="mdbook-${tag}-x86_64-unknown-linux-gnu.tar.gz"
+          mkdir -p mdbook
+          gh release download -R rust-lang/mdBook -p "${archive}" -D mdbook
+          tar -xzf mdbook/"${archive}" -C mdbook
+          echo `pwd`/mdbook >> $GITHUB_PATH
+
+      - name: Check mdBook version
+        run: mdbook --version
+
+      - name: Build the book
+        run: mdbook build ./docs
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ./docs/book
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

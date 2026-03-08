@@ -44,6 +44,7 @@ pub struct Project {
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct Build {
     pub out_dir: Option<String>,
+    pub embed_search_dirs: Option<Vec<String>>,
 }
 
 /// `install` セクション

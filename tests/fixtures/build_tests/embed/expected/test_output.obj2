@@ -1,0 +1,18 @@
+local no_embed = require("lib_no_embed")
+
+-- aulua embed: lib_a
+local function __aulua_embed_1__()
+return {name = "lib_a"}
+
+end
+local a = __aulua_embed_1__()
+
+-- aulua embed: lib_b
+local function __aulua_embed_2__()
+return {name = "lib_b"}
+
+end
+local b = __aulua_embed_2__()
+
+local a_again = __aulua_embed_1__()
+

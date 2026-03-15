@@ -1,0 +1,8 @@
+build:
+  embed_search_dirs:
+    - lib
+
+scripts:
+  - name : test_output.obj2
+    sources:
+      - path: tests/fixtures/build_tests/embed/src/script1.obj2

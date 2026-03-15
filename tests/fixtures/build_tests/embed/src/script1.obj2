@@ -1,0 +1,9 @@
+local no_embed = require("lib_no_embed")
+
+---$embed
+local a = require("lib_a")
+
+---$embed
+local b = require("lib_b")
+
+local a_again = require("lib_a")

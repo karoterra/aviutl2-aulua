@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Config",
+  "title": "RawConfig",
   "description": "全体の設定ファイル構造",
   "type": "object",
   "properties": {
     "build": {
       "anyOf": [
         {
-          "$ref": "#/$defs/Build"
+          "$ref": "#/$defs/RawBuild"
         },
         {
           "type": "null"
@@ -17,7 +17,7 @@
     "install": {
       "anyOf": [
         {
-          "$ref": "#/$defs/Install"
+          "$ref": "#/$defs/RawInstall"
         },
         {
           "type": "null"
@@ -27,7 +27,7 @@
     "project": {
       "anyOf": [
         {
-          "$ref": "#/$defs/Project"
+          "$ref": "#/$defs/RawProject"
         },
         {
           "type": "null"
@@ -37,7 +37,7 @@
     "scripts": {
       "type": "array",
       "items": {
-        "$ref": "#/$defs/Script"
+        "$ref": "#/$defs/RawScript"
       }
     }
   },
@@ -45,7 +45,7 @@
     "scripts"
   ],
   "$defs": {
-    "Build": {
+    "RawBuild": {
       "description": "`build` セクション",
       "type": "object",
       "properties": {
@@ -66,7 +66,7 @@
         }
       }
     },
-    "Install": {
+    "RawInstall": {
       "description": "`install` セクション",
       "type": "object",
       "properties": {
@@ -78,7 +78,7 @@
         }
       }
     },
-    "Project": {
+    "RawProject": {
       "description": "`project` セクション",
       "type": "object",
       "properties": {
@@ -93,7 +93,7 @@
         }
       }
     },
-    "Script": {
+    "RawScript": {
       "description": "各出力スクリプト単位の設定",
       "type": "object",
       "properties": {
@@ -103,7 +103,7 @@
         "sources": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/ScriptSource"
+            "$ref": "#/$defs/RawScriptSource"
           }
         }
       },
@@ -112,7 +112,7 @@
         "sources"
       ]
     },
-    "ScriptSource": {
+    "RawScriptSource": {
       "description": "各スクリプトソースの設定",
       "type": "object",
       "properties": {

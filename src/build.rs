@@ -4,13 +4,13 @@ use std::path::{Path, PathBuf};
 
 use regex::Regex;
 
-use crate::config::{Config, Script};
+use crate::config::{ResolvedConfig, ResolvedScript};
 use crate::embed::process_embeds;
 use crate::include::process_includes;
 use crate::text_utils::read_text;
 use crate::ui_control::{apply_ui_blocks, parse_ui_blocks};
 
-pub fn build_all(config: &Config, out_dir: &Path) -> anyhow::Result<()> {
+pub fn build_all(config: &ResolvedConfig, out_dir: &Path) -> anyhow::Result<()> {
     fs::create_dir_all(out_dir)?;
 
     for script in &config.scripts {
@@ -20,7 +20,11 @@ pub fn build_all(config: &Config, out_dir: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn build_script(script: &Script, config: &Config, out_dir: &Path) -> anyhow::Result<()> {
+fn build_script(
+    script: &ResolvedScript,
+    config: &ResolvedConfig,
+    out_dir: &Path,
+) -> anyhow::Result<()> {
     let mut combined = String::new();
 
     for source in &script.sources {
@@ -47,28 +51,12 @@ fn build_script(script: &Script, config: &Config, out_dir: &Path) -> anyhow::Res
         let content = process_embeds(
             &content,
             src_path.parent().unwrap_or(Path::new("")),
-            &config
-                .build
-                .as_ref()
-                .map(|b| {
-                    b.embed_search_dirs
-                        .as_ref()
-                        .unwrap_or(&vec![])
-                        .iter()
-                        .map(PathBuf::from)
-                        .collect::<Vec<_>>()
-                })
-                .unwrap_or_default(),
+            &config.build.embed_search_dirs,
         )?;
 
         // 変数
-        let mut vars = HashMap::new();
-        if let Some(global) = config.project.as_ref().and_then(|p| p.variables.as_ref()) {
-            vars.extend(global.clone());
-        }
-        if let Some(local) = &source.variables {
-            vars.extend(local.clone());
-        }
+        let mut vars = config.project.variables.clone();
+        vars.extend(source.variables.clone());
         let (content, warnings) = apply_variables(&content, &vars);
 
         for warning in warnings {

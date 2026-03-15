@@ -4,10 +4,10 @@ use std::path::Path;
 use anyhow::anyhow;
 use schemars::schema_for;
 
-use crate::config::Config;
+use crate::config::RawConfig;
 
 pub fn generate_config_schema(path: &Path) -> anyhow::Result<()> {
-    let schema = schema_for!(Config);
+    let schema = schema_for!(RawConfig);
     let schema_json = serde_json::to_string_pretty(&schema)
         .map_err(|e| anyhow!("スキーマの生成に失敗しました: {e}"))?;
     fs::write(path, schema_json)

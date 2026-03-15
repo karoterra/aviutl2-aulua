@@ -1,9 +1,10 @@
 use std::fs;
 use std::path::Path;
 
-use crate::config::Config;
+use crate::config::ResolvedConfig;
+
 pub fn install_all(
-    config: &Config,
+    config: &ResolvedConfig,
     build_dir: &Path,
     out_dir: &Path,
     dry_run: bool,
@@ -34,8 +35,6 @@ pub fn install_all(
 
 #[cfg(test)]
 mod tests {
-    use crate::config::Script;
-
     use super::*;
     use std::fs;
     use tempfile::tempdir;
@@ -49,19 +48,33 @@ mod tests {
         let src_file = tmp_src.path().join(script_name);
         fs::write(&src_file, "-- dummy script").unwrap();
 
-        let config = Config {
-            project: None,
-            build: None,
-            install: None,
-            scripts: vec![Script {
+        let config = ResolvedConfig {
+            project: crate::config::ResolvedProject {
+                variables: std::collections::HashMap::new(),
+            },
+            build: crate::config::ResolvedBuild {
+                out_dir: tmp_src.path().to_path_buf(),
+                embed_search_dirs: vec![],
+            },
+            install: crate::config::ResolvedInstall {
+                out_dir: tmp_dst.path().to_path_buf(),
+            },
+            scripts: vec![crate::config::ResolvedScript {
                 name: script_name.to_string(),
                 sources: vec![],
             }],
+            config_dir: Path::new(".").to_path_buf(),
         };
 
-        install_all(&config, tmp_src.path(), tmp_dst.path(), true).unwrap();
+        install_all(
+            &config,
+            &config.build.out_dir,
+            &config.install.out_dir,
+            true,
+        )
+        .unwrap();
 
-        let dst_file = tmp_dst.path().join(script_name);
+        let dst_file = config.install.out_dir.join(script_name);
         assert!(
             !dst_file.exists(),
             "dry-run ではファイルはコピーされないはず"

@@ -24,9 +24,7 @@ fn find_lua_module(
     }
 
     for search_dir in search_dirs {
-        let search_path = base_dir
-            .join(search_dir)
-            .join(format!("{}.lua", module_name_formatted));
+        let search_path = search_dir.join(format!("{}.lua", module_name_formatted));
         if search_path.exists() {
             return Ok(search_path);
         }
@@ -146,7 +144,7 @@ mod tests {
         let input = read_text(&input_path).unwrap();
         let expected_path = base_dir.join("out.lua");
         let expected = read_text(&expected_path).unwrap();
-        let search_dirs = [PathBuf::from("lib")];
+        let search_dirs = [base_dir.join("lib")];
         let output = process_embeds(&input, &base_dir, &search_dirs).unwrap();
         assert_eq!(output, expected);
     }

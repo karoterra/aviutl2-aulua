@@ -53,6 +53,7 @@ fn assert_dirs_equal(out_dir: &Path, expected_dir: &Path) {
 
 #[rstest]
 #[case::basic("basic")]
+#[case::embed("embed")]
 fn test_build(#[case] case_name: &str) {
     let base_dir = common::get_fixture_path("build_tests").join(case_name);
     let config_path = base_dir.join("aulua.yaml");

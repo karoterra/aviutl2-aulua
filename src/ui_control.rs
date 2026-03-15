@@ -37,6 +37,19 @@ pub struct UiControlBlock {
     pub meta: Option<UiControlMeta>,
 }
 
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+struct TrackOptions {
+    min: Option<String>,
+    max: Option<String>,
+    step: Option<String>,
+}
+
+enum TrackOptionLine<'a> {
+    Min(&'a str),
+    Max(&'a str),
+    Step(&'a str),
+}
+
 pub fn parse_ui_blocks(source: &str) -> Vec<UiControlBlock> {
     let mut blocks = Vec::new();
     let mut lines = source.split("\n").enumerate().peekable();
@@ -155,49 +168,131 @@ where
     None
 }
 
+fn parse_track_header(input: &str) -> Option<(String, TrackOptions)> {
+    let input = input.trim();
+    if input.is_empty() {
+        return None;
+    }
+
+    let mut parts = input.split(',').map(|s| s.trim());
+    let label = parts.next()?.to_string();
+    if label.is_empty() {
+        return None;
+    }
+
+    let mut options = TrackOptions::default();
+
+    for part in parts {
+        let (key, value) = part.split_once('=')?;
+        let key = key.trim();
+        let value = value.trim();
+
+        if value.is_empty() {
+            return None;
+        }
+
+        match key {
+            "min" => {
+                if options.min.is_some() {
+                    return None;
+                }
+                options.min = Some(value.to_string());
+            }
+            "max" => {
+                if options.max.is_some() {
+                    return None;
+                }
+                options.max = Some(value.to_string());
+            }
+            "step" => {
+                if options.step.is_some() {
+                    return None;
+                }
+                options.step = Some(value.to_string());
+            }
+            _ => return None,
+        }
+    }
+
+    Some((label, options))
+}
+
+fn parse_track_option_line(line: &str) -> Option<TrackOptionLine<'_>> {
+    let line = line.trim();
+
+    line.strip_prefix("---min=")
+        .map(|value| TrackOptionLine::Min(value.trim()))
+        .or_else(|| {
+            line.strip_prefix("---max=")
+                .map(|value| TrackOptionLine::Max(value.trim()))
+        })
+        .or_else(|| {
+            line.strip_prefix("---step=")
+                .map(|value| TrackOptionLine::Step(value.trim()))
+        })
+}
+
+fn apply_track_option_line(options: &mut TrackOptions, line: TrackOptionLine<'_>) -> Option<()> {
+    match line {
+        TrackOptionLine::Min(value) => {
+            if options.min.is_some() {
+                return None;
+            }
+            options.min = Some(value.to_string());
+        }
+        TrackOptionLine::Max(value) => {
+            if options.max.is_some() {
+                return None;
+            }
+            options.max = Some(value.to_string());
+        }
+        TrackOptionLine::Step(value) => {
+            if options.step.is_some() {
+                return None;
+            }
+            options.step = Some(value.to_string());
+        }
+    }
+    Some(())
+}
+
 fn parse_track_block<'a, I>(
     start_line: usize,
-    label: &'a str,
+    header: &'a str,
     lines: &mut Peekable<I>,
 ) -> Option<UiControlBlock>
 where
     I: Iterator<Item = (usize, &'a str)>,
 {
-    let mut min_value = "0".to_string();
-    let mut max_value = "100".to_string();
-    let mut step = None;
+    let (label, mut options) = parse_track_header(header)?;
 
     while let Some(&(i, line)) = lines.peek() {
         let line = line.trim();
-        if let Some(value) = line.strip_prefix("---min=") {
-            min_value = value.trim().to_string();
-            lines.next();
-        } else if let Some(value) = line.strip_prefix("---max=") {
-            max_value = value.trim().to_string();
-            lines.next();
-        } else if let Some(value) = line.strip_prefix("---step=") {
-            step = Some(value.trim().to_string());
+
+        if let Some(option_line) = parse_track_option_line(line) {
+            apply_track_option_line(&mut options, option_line)?;
             lines.next();
         } else if line.starts_with("--") {
             lines.next();
         } else if let Some((name, value, end_offset)) = parse_assignment(line, lines) {
             return Some(UiControlBlock {
                 kind: UiControlKind::Track,
-                label: label.trim().to_string(),
+                label,
                 var_name: name,
                 default_value: value,
                 start_line,
                 end_line: i + end_offset,
                 meta: Some(UiControlMeta::Track {
-                    min: min_value,
-                    max: max_value,
-                    step,
+                    min: options.min.unwrap_or_else(|| "0".to_string()),
+                    max: options.max.unwrap_or_else(|| "100".to_string()),
+                    step: options.step,
                 }),
             });
         } else {
             break;
         }
     }
+
     None
 }
 

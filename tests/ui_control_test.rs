@@ -19,6 +19,8 @@ use common::get_fixture_path;
 #[case::track_1("ui_control_track_1_in.anm2", "ui_control_track_1_out.anm2")]
 #[case::track_2("ui_control_track_2_in.anm2", "ui_control_track_2_out.anm2")]
 #[case::track_3("ui_control_track_3_in.anm2", "ui_control_track_3_out.anm2")]
+#[case::track_4("ui_control_track_4_in.anm2", "ui_control_track_4_out.anm2")]
+#[case::track_5("ui_control_track_5_in.anm2", "ui_control_track_5_out.anm2")]
 #[case::check_1("ui_control_check_1_in.anm2", "ui_control_check_1_out.anm2")]
 #[case::checksection_1(
     "ui_control_checksection_1_in.anm2",

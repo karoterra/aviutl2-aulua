@@ -6,30 +6,32 @@
 
 ## 例
 
-`aulua.yaml`
-```yaml
+設定ファイル
+
+```yaml:aulua.yaml
 scripts:
   - name: スクリプト.anm2
     sources:
       - path: スクリプトソース.anm2
 ```
 
-`スクリプトソース.anm2`
-```lua
+スクリプトソース
+
+```lua:スクリプトソース.anm2
 --[[pixelshader@psmain:
 ---$include "シェーダー.hlsl"
 ]]
 ```
 
-`シェーダー.hlsl`
-```hlsl
+```hlsl:シェーダー.hlsl
 float4 psmain(float4 pos : SV_Position) : SV_Target {
     return float4(1.0);
 }
 ```
 
-`スクリプト.anm2`
-```lua
+ビルド結果
+
+```lua:スクリプト.anm2
 --[[pixelshader@psmain:
 float4 psmain(float4 pos : SV_Position) : SV_Target {
     return float4(1.0);

@@ -7,8 +7,9 @@
 
 ## 例
 
-`aulua.yaml`
-```yaml
+設定ファイル
+
+```yaml:aulua.yaml
 scripts:
   - name: "@MyEffect.anm2"
     sources:
@@ -18,18 +19,19 @@ scripts:
         label: EffectB
 ```
 
-`scripts/EffectA.in.anm2`
-```lua
+スクリプトソース
+
+```lua:scripts/EffectA.in.anm2
 -- EffectA.in.anm2
 ```
 
-`scripts/EffectB.in.anm2`
-```lua
+```lua:scripts/EffectB.in.anm2
 -- EffectB.in.anm2
 ```
 
-`@MyEffect.anm2`
-```lua
+ビルド結果
+
+```lua:@MyEffect.anm2
 @EffectA
 -- EffectA.in.anm2
 

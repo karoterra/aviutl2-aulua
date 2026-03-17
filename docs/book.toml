@@ -7,3 +7,9 @@ language = "ja"
 [output.html]
 git-repository-url = "https://github.com/karoterra/aviutl2-aulua"
 site-url = "/aviutl2-aulua/"
+additional-css = ["theme/codeblock-title.css"]
+
+[output.markdown]
+
+[preprocessor.codeblock-title]
+command = "cargo run --quiet --manifest-path ../tools/mdbook-codeblock-title/Cargo.toml --"

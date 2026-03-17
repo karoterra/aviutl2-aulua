@@ -14,8 +14,9 @@
 
 ## 例
 
-`aulua.yaml`
-```yaml
+設定ファイル
+
+```yaml:aulua.yaml
 project:
   variables:
     HOGE: ほげ
@@ -29,14 +30,16 @@ scripts:
           FUGA: フガ
 ```
 
-`スクリプトソース.anm2`
-```lua
+スクリプトソース
+
+```lua:スクリプトソース.anm2
 -- HOGE: ${HOGE}
 -- FUGA: ${FUGA}
 ```
 
-`スクリプト.anm2`
-```lua
+ビルド結果
+
+```lua:スクリプト.anm2
 -- HOGE: ほげ
 -- FUGA: フガ
 ```

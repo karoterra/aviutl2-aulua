@@ -1,0 +1,23 @@
+.codeblock-with-title {
+    margin: 1em 0;
+}
+
+.codeblock-with-title > .codeblock-title {
+    padding: 0.4em 0.75em;
+    font-family: var(--mono-font);
+    font-size: 0.9em;
+    line-height: 1.4;
+    color: var(--sidebar-fg);
+    background-color: var(--sidebar-bg);
+    border: 1px solid var(--quote-border);
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    overflow-x: auto;
+    white-space: nowrap;
+}
+
+.codeblock-with-title > pre {
+    margin-top: 0;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+}

@@ -1,0 +1,8 @@
+[package]
+name = "mdbook-codeblock-title"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+mdbook-preprocessor = "0.5.2"
+serde_json = "1.0.149"

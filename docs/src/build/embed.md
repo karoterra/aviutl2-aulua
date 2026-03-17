@@ -7,14 +7,14 @@
 
 ## 例
 
-`スクリプトソース.anm2`
-```lua
+スクリプトソース
+
+```lua:スクリプトソース.anm2
 ---$embed
 local mylib = require("mylib")
 ```
 
-`mylib.lua`
-```lua
+```lua:mylib.lua
 local M = {}
 function M.add(x, y)
     return x + y
@@ -23,7 +23,8 @@ return M
 ```
 
 ビルド結果
-```lua
+
+```lua:スクリプト.anm2
 -- aulua embed: mylib
 local function __aulua_embed_1__()
 local M = {}

@@ -3,7 +3,7 @@
 `aulua` ではプロジェクトの設定ファイルを `aulua.yaml` に記載します。
 以下は設定ファイルのサンプルです。
 
-```yaml
+```yaml:aulua.yaml
 {{#include config_example.yaml}}
 ```
 

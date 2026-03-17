@@ -19,19 +19,19 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@v6
 
-      - name: Install mdBook (prebuild)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          tag=$(gh release list -R rust-lang/mdBook --json tagName,isLatest -q '.[] | select(.isLatest == true) | .tagName')
-          archive="mdbook-${tag}-x86_64-unknown-linux-gnu.tar.gz"
-          mkdir -p mdbook
-          gh release download -R rust-lang/mdBook -p "${archive}" -D mdbook
-          tar -xzf mdbook/"${archive}" -C mdbook
-          echo `pwd`/mdbook >> $GITHUB_PATH
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Install mdBook (cargo)
+        run: cargo install --locked mdbook@0.5.2
 
       - name: Check mdBook version
         run: mdbook --version
+
+      - name: Build custom preprocessor
+        run: cargo build --manifest-path ./tools/mdbook-codeblock-title/Cargo.toml
 
       - name: Build the book
         run: mdbook build ./docs
@@ -42,7 +42,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v4
         with:
-          path: ./docs/book
+          path: ./docs/book/html
 
   deploy:
     environment:

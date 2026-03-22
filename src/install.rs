@@ -59,6 +59,7 @@ mod tests {
             install: crate::config::ResolvedInstall {
                 out_dir: tmp_dst.path().to_path_buf(),
             },
+            package: None,
             scripts: vec![crate::config::ResolvedScript {
                 name: script_name.to_string(),
                 sources: vec![],

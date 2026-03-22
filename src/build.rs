@@ -4,11 +4,13 @@ use std::path::{Path, PathBuf};
 
 use regex::Regex;
 
-use crate::config::{ResolvedConfig, ResolvedScript};
+use crate::config::{ResolvedConfig, ResolvedScript, ResolvedScriptSource};
 use crate::embed::process_embeds;
 use crate::include::process_includes;
 use crate::text_utils::read_text;
 use crate::ui_control::{apply_ui_blocks, parse_ui_blocks};
+
+const RESERVED_PACKAGE_VARS: &[&str] = &["PACKAGE_ID", "PACKAGE_NAME", "PACKAGE_VERSION"];
 
 pub fn build_all(config: &ResolvedConfig, out_dir: &Path) -> anyhow::Result<()> {
     fs::create_dir_all(out_dir)?;
@@ -55,8 +57,7 @@ fn build_script(
         )?;
 
         // 変数
-        let mut vars = config.project.variables.clone();
-        vars.extend(source.variables.clone());
+        let vars = build_variables_for_source(config, source)?;
         let (content, warnings) = apply_variables(&content, &vars);
 
         for warning in warnings {
@@ -80,6 +81,48 @@ fn build_script(
     println!("✅ ビルド完了: {}", out_path.display());
 
     Ok(())
+}
+
+fn ensure_no_reserved_package_vars(
+    vars: &HashMap<String, String>,
+    scope: &str,
+) -> anyhow::Result<()> {
+    for key in RESERVED_PACKAGE_VARS {
+        if vars.contains_key(*key) {
+            return Err(anyhow::anyhow!(
+                "{} に予約変数 {} を定義することはできません。",
+                scope,
+                key
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn build_variables_for_source(
+    config: &ResolvedConfig,
+    source: &ResolvedScriptSource,
+) -> anyhow::Result<HashMap<String, String>> {
+    ensure_no_reserved_package_vars(&config.project.variables, "project.variables")?;
+    ensure_no_reserved_package_vars(&source.variables, "source.variables")?;
+
+    let mut vars = config.project.variables.clone();
+
+    if let Some(package) = &config.package {
+        if let Some(id) = &package.id {
+            vars.insert("PACKAGE_ID".to_string(), id.clone());
+        }
+        if let Some(name) = &package.name {
+            vars.insert("PACKAGE_NAME".to_string(), name.clone());
+        }
+        if let Some(version) = &package.version {
+            vars.insert("PACKAGE_VERSION".to_string(), version.clone());
+        }
+    }
+
+    vars.extend(source.variables.clone());
+
+    Ok(vars)
 }
 
 fn apply_variables(text: &str, vars: &HashMap<String, String>) -> (String, Vec<String>) {

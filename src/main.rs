@@ -6,6 +6,7 @@ use aulua::build::build_all;
 use aulua::config_loader::load_config;
 use aulua::init::init_project;
 use aulua::install::install_all;
+use aulua::pack::pack_project;
 use aulua::schema::generate_config_schema;
 
 #[derive(Parser)]
@@ -25,6 +26,8 @@ enum Commands {
         #[arg(long)]
         dry_run: bool,
     },
+    /// au2pkg パッケージを作成する
+    Pack,
     /// auluaプロジェクトを作成する
     Init {
         /// プロジェクトを作成するフォルダを指定する
@@ -56,6 +59,10 @@ fn main() {
                 dry_run,
             )
             .expect("インストールに失敗しました");
+        }
+        Commands::Pack => {
+            let config = load_config("aulua.yaml").expect("設定ファイルの読み込みに失敗しました");
+            pack_project(&config).expect("パッケージ作成に失敗しました");
         }
         Commands::Init { dir } => {
             init_project(&dir).expect("プロジェクトの初期化に失敗しました");

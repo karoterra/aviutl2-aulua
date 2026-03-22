@@ -5,4 +5,4 @@ build:
 scripts:
   - name : test_output.obj2
     sources:
-      - path: tests/fixtures/build_tests/embed/src/script1.obj2
+      - path: src/script1.obj2

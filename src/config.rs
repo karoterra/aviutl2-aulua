@@ -9,6 +9,7 @@ pub struct RawConfig {
     pub project: Option<RawProject>,
     pub build: Option<RawBuild>,
     pub install: Option<RawInstall>,
+    pub package: Option<RawPackage>,
     pub scripts: Vec<RawScript>,
 }
 
@@ -31,8 +32,8 @@ impl RawConfig {
         let build = ResolvedBuild {
             out_dir: raw_build
                 .out_dir
-                .unwrap_or_else(|| "build".to_string())
-                .into(),
+                .map(|d| config_dir.join(d))
+                .unwrap_or_else(|| config_dir.join("build")),
             embed_search_dirs: raw_build
                 .embed_search_dirs
                 .unwrap_or_default()
@@ -50,6 +51,34 @@ impl RawConfig {
             }),
         };
 
+        let raw_package = self.package;
+        let package = raw_package.map(|p| ResolvedPackage {
+            id: p.id,
+            name: p.name,
+            information: p.information,
+            version: p.version,
+            out_dir: p
+                .out_dir
+                .map(|d| config_dir.join(d))
+                .unwrap_or_else(|| build.out_dir.clone()),
+            file_name: p.file_name,
+            script_sub_dir: p.script_sub_dir,
+            message: p.message.map(|m| match m {
+                RawPackageMessage::File { file } => {
+                    ResolvedPackageMessage::File(config_dir.join(file))
+                }
+                RawPackageMessage::Text { text } => ResolvedPackageMessage::Text(text),
+            }),
+            assets: p
+                .assets
+                .into_iter()
+                .map(|a| ResolvedPackageAsset {
+                    src: config_dir.join(a.src),
+                    dest: a.dest,
+                })
+                .collect(),
+        });
+
         let scripts = self
             .scripts
             .into_iter()
@@ -59,7 +88,7 @@ impl RawConfig {
                     .sources
                     .into_iter()
                     .map(|src| ResolvedScriptSource {
-                        path: src.path.into(),
+                        path: config_dir.join(src.path),
                         label: src.label,
                         variables: src.variables.unwrap_or_default(),
                     })
@@ -71,6 +100,7 @@ impl RawConfig {
             project,
             build,
             install,
+            package,
             scripts,
             config_dir,
         }
@@ -96,6 +126,35 @@ pub struct RawInstall {
     pub out_dir: Option<String>,
 }
 
+/// `package` セクション
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct RawPackage {
+    pub id: Option<String>,
+    pub name: Option<String>,
+    pub information: Option<String>,
+    pub version: Option<String>,
+    pub out_dir: Option<String>,
+    pub file_name: Option<String>,
+    pub script_sub_dir: Option<String>,
+    pub message: Option<RawPackageMessage>,
+
+    #[serde(default)]
+    pub assets: Vec<RawPackageAsset>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum RawPackageMessage {
+    File { file: PathBuf },
+    Text { text: String },
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct RawPackageAsset {
+    pub src: PathBuf,
+    pub dest: String,
+}
+
 /// 各出力スクリプト単位の設定
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct RawScript {
@@ -116,8 +175,161 @@ pub struct ResolvedConfig {
     pub project: ResolvedProject,
     pub build: ResolvedBuild,
     pub install: ResolvedInstall,
+    pub package: Option<ResolvedPackage>,
     pub scripts: Vec<ResolvedScript>,
     pub config_dir: PathBuf,
+}
+
+fn build_package_template_vars(
+    project_vars: &HashMap<String, String>,
+    id: &str,
+    name: &str,
+    version: Option<&str>,
+) -> HashMap<String, String> {
+    let mut vars = project_vars.clone();
+
+    vars.insert("id".to_string(), id.to_string());
+    vars.insert("name".to_string(), name.to_string());
+
+    if let Some(version) = version {
+        vars.insert("version".to_string(), version.to_string());
+    }
+
+    vars
+}
+
+fn render_package_template(input: &str, vars: &HashMap<String, String>) -> anyhow::Result<String> {
+    let mut result = String::with_capacity(input.len());
+    let mut chars = input.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        if ch != '{' {
+            result.push(ch);
+            continue;
+        }
+
+        let mut key = String::new();
+        let mut closed = false;
+
+        while let Some(&next) = chars.peek() {
+            chars.next();
+
+            if next == '}' {
+                closed = true;
+                break;
+            }
+
+            key.push(next);
+        }
+
+        if !closed {
+            return Err(anyhow::anyhow!(
+                "packageテンプレートの構文エラー: '{{' に対応する '}}' がありません: {}",
+                input
+            ));
+        }
+
+        if key.is_empty() {
+            return Err(anyhow::anyhow!(
+                "packageテンプレートの構文エラー: 空のプレースホルダー {{}} は使用できません: {}",
+                input
+            ));
+        }
+
+        let value = vars.get(&key).ok_or_else(|| {
+            anyhow::anyhow!(
+                "packageテンプレート内で未定義の変数 {{{}}} が使われています: {}",
+                key,
+                input
+            )
+        })?;
+
+        result.push_str(value);
+    }
+
+    Ok(result)
+}
+
+impl ResolvedConfig {
+    pub fn package_for_pack(&self) -> anyhow::Result<PackConfig> {
+        let p = self
+            .package
+            .as_ref()
+            .ok_or(anyhow::anyhow!("packageセクションが定義されていません。"))?;
+
+        let id =
+            p.id.clone()
+                .filter(|s| !s.trim().is_empty())
+                .ok_or(anyhow::anyhow!("package.idが定義されていません。"))?;
+        let name = p
+            .name
+            .clone()
+            .filter(|s| !s.trim().is_empty())
+            .ok_or(anyhow::anyhow!("package.nameが定義されていません。"))?;
+        let information_template = p
+            .information
+            .clone()
+            .filter(|s| !s.trim().is_empty())
+            .ok_or(anyhow::anyhow!("package.informationが定義されていません。"))?;
+
+        let vars =
+            build_package_template_vars(&self.project.variables, &id, &name, p.version.as_deref());
+
+        let file_name_template = p.file_name.clone().unwrap_or_else(|| {
+            if p.version.is_some() {
+                "{id}-v{version}.au2pkg.zip".to_string()
+            } else {
+                "{id}.au2pkg.zip".to_string()
+            }
+        });
+        let script_sub_dir_template = p
+            .script_sub_dir
+            .clone()
+            .unwrap_or_else(|| "{id}".to_string());
+
+        let information = render_package_template(&information_template, &vars)?;
+        let file_name = render_package_template(&file_name_template, &vars)?;
+        let script_sub_dir = render_package_template(&script_sub_dir_template, &vars)?;
+
+        if information.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "package.information の解決結果が空文字列になりました。"
+            ));
+        }
+        if file_name.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "package.file_name の解決結果が空文字列になりました。"
+            ));
+        }
+        if script_sub_dir.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "package.script_sub_dir の解決結果が空文字列になりました。"
+            ));
+        }
+
+        let assets = p
+            .assets
+            .iter()
+            .map(|asset| {
+                Ok(ResolvedPackageAsset {
+                    src: asset.src.clone(),
+                    dest: render_package_template(&asset.dest, &vars)?,
+                })
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
+
+        Ok(PackConfig {
+            id,
+            name,
+            information,
+            version: p.version.clone(),
+            out_dir: p.out_dir.clone(),
+            file_name,
+            script_sub_dir,
+            message: p.message.clone(),
+            assets,
+        })
+    }
 }
 
 impl ResolvedConfig {
@@ -147,6 +359,31 @@ pub struct ResolvedInstall {
 }
 
 #[derive(Debug)]
+pub struct ResolvedPackage {
+    pub id: Option<String>,
+    pub name: Option<String>,
+    pub information: Option<String>,
+    pub version: Option<String>,
+    pub out_dir: PathBuf,
+    pub file_name: Option<String>,
+    pub script_sub_dir: Option<String>,
+    pub message: Option<ResolvedPackageMessage>,
+    pub assets: Vec<ResolvedPackageAsset>,
+}
+
+#[derive(Debug, Clone)]
+pub enum ResolvedPackageMessage {
+    File(PathBuf),
+    Text(String),
+}
+
+#[derive(Debug, Clone)]
+pub struct ResolvedPackageAsset {
+    pub src: PathBuf,
+    pub dest: String,
+}
+
+#[derive(Debug)]
 pub struct ResolvedScript {
     pub name: String,
     pub sources: Vec<ResolvedScriptSource>,
@@ -157,6 +394,19 @@ pub struct ResolvedScriptSource {
     pub path: PathBuf,
     pub label: Option<String>,
     pub variables: HashMap<String, String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PackConfig {
+    pub id: String,
+    pub name: String,
+    pub information: String,
+    pub version: Option<String>,
+    pub out_dir: PathBuf,
+    pub file_name: String,
+    pub script_sub_dir: String,
+    pub message: Option<ResolvedPackageMessage>,
+    pub assets: Vec<ResolvedPackageAsset>,
 }
 
 #[cfg(test)]
@@ -206,6 +456,7 @@ mod tests {
                 embed_search_dirs: Some(vec!["lib".to_string(), "modules".to_string()]),
             }),
             install: None,
+            package: None,
             scripts: vec![],
         };
 
@@ -219,5 +470,18 @@ mod tests {
                 PathBuf::from("/tmp/project/modules")
             ]
         );
+    }
+
+    #[test]
+    fn test_render_package_template() {
+        let input = "{id}-v{version}.au2pkg.zip";
+        let vars = HashMap::from([
+            ("id".to_string(), "SamplePackage".to_string()),
+            ("version".to_string(), "1.0.0".to_string()),
+        ]);
+        let expected = "SamplePackage-v1.0.0.au2pkg.zip";
+
+        let output = render_package_template(input, &vars).unwrap();
+        assert_eq!(output, expected);
     }
 }

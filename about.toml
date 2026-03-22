@@ -2,4 +2,9 @@ accepted = [
     "Apache-2.0",
     "MIT",
     "Unicode-3.0",
+    "BSD-3-Clause",
+    "CC0-1.0",
+    "MIT-0",
+    "Zlib",
+    "bzip2-1.0.6",
 ]

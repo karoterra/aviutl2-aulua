@@ -23,6 +23,8 @@ pub enum UiControlMeta {
         min: String,
         max: String,
         step: Option<String>,
+        zero_label: Option<String>,
+        scale: Option<String>,
     },
 }
 
@@ -42,12 +44,16 @@ struct TrackOptions {
     min: Option<String>,
     max: Option<String>,
     step: Option<String>,
+    zero_label: Option<String>,
+    scale: Option<String>,
 }
 
 enum TrackOptionLine<'a> {
     Min(&'a str),
     Max(&'a str),
     Step(&'a str),
+    ZeroLabel(&'a str),
+    Scale(&'a str),
 }
 
 pub fn parse_ui_blocks(source: &str) -> Vec<UiControlBlock> {
@@ -168,6 +174,16 @@ where
     None
 }
 
+fn validate_track_options(options: &TrackOptions) -> Option<()> {
+    if options.zero_label.is_some() && options.step.is_none() {
+        return None;
+    }
+    if options.scale.is_some() && !(options.step.is_some() && options.zero_label.is_some()) {
+        return None;
+    }
+    Some(())
+}
+
 fn parse_track_header(input: &str) -> Option<(String, TrackOptions)> {
     let input = input.trim();
     if input.is_empty() {
@@ -210,6 +226,18 @@ fn parse_track_header(input: &str) -> Option<(String, TrackOptions)> {
                 }
                 options.step = Some(value.to_string());
             }
+            "zero_label" => {
+                if options.zero_label.is_some() {
+                    return None;
+                }
+                options.zero_label = Some(value.to_string());
+            }
+            "scale" => {
+                if options.scale.is_some() {
+                    return None;
+                }
+                options.scale = Some(value.to_string());
+            }
             _ => return None,
         }
     }
@@ -229,6 +257,14 @@ fn parse_track_option_line(line: &str) -> Option<TrackOptionLine<'_>> {
         .or_else(|| {
             line.strip_prefix("---step=")
                 .map(|value| TrackOptionLine::Step(value.trim()))
+        })
+        .or_else(|| {
+            line.strip_prefix("---zero_label=")
+                .map(|value| TrackOptionLine::ZeroLabel(value.trim()))
+        })
+        .or_else(|| {
+            line.strip_prefix("---scale=")
+                .map(|value| TrackOptionLine::Scale(value.trim()))
         })
 }
 
@@ -251,6 +287,18 @@ fn apply_track_option_line(options: &mut TrackOptions, line: TrackOptionLine<'_>
                 return None;
             }
             options.step = Some(value.to_string());
+        }
+        TrackOptionLine::ZeroLabel(value) => {
+            if options.zero_label.is_some() {
+                return None;
+            }
+            options.zero_label = Some(value.to_string());
+        }
+        TrackOptionLine::Scale(value) => {
+            if options.scale.is_some() {
+                return None;
+            }
+            options.scale = Some(value.to_string());
         }
     }
     Some(())
@@ -275,6 +323,8 @@ where
         } else if line.starts_with("--") {
             lines.next();
         } else if let Some((name, value, end_offset)) = parse_assignment(line, lines) {
+            validate_track_options(&options)?;
+
             return Some(UiControlBlock {
                 kind: UiControlKind::Track,
                 label,
@@ -286,6 +336,8 @@ where
                     min: options.min.unwrap_or_else(|| "0".to_string()),
                     max: options.max.unwrap_or_else(|| "100".to_string()),
                     step: options.step,
+                    zero_label: options.zero_label,
+                    scale: options.scale,
                 }),
             });
         } else {
@@ -368,10 +420,25 @@ pub fn apply_ui_blocks(source: &str, blocks: &[UiControlBlock]) -> String {
             }
             UiControlKind::Track => {
                 let mut line = format!("--track@{}:{}", block.var_name, block.label);
-                if let Some(UiControlMeta::Track { min, max, step }) = &block.meta {
+                if let Some(UiControlMeta::Track {
+                    min,
+                    max,
+                    step,
+                    zero_label,
+                    scale,
+                }) = &block.meta
+                {
                     line.push_str(&format!(",{},{},{}", min, max, block.default_value));
                     if let Some(step) = step {
                         line.push_str(&format!(",{step}"));
+
+                        if let Some(zero_label) = zero_label {
+                            line.push_str(&format!(",{zero_label}"));
+
+                            if let Some(scale) = scale {
+                                line.push_str(&format!(",{scale}"));
+                            }
+                        }
                     }
                 }
                 line

@@ -5,6 +5,7 @@ pub mod embed;
 pub mod include;
 pub mod init;
 pub mod install;
+pub mod pack;
 pub mod schema;
 pub mod text_utils;
 pub mod ui_control;

@@ -1,0 +1,2 @@
+---$track:X速度, min = -10, max = 10, step = 1, zero_label = ゼロ, scale = 0.1
+local vx = 0

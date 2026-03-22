@@ -7,4 +7,5 @@
 - [`aulua init`](init.md) --- 指定したフォルダに `aulua.yaml` などいくつかのテンプレートを作成します。
 - [`aulua build`](build.md) --- スクリプトファイルをビルドします。
 - [`aulua install`](install.md) --- スクリプトファイルをインストールします。
+- [`aulua pack`](pack.md) --- au2pkg パッケージを作成します。
 - [`aulua schema`](schema.md) --- `aulua.yaml` のスキーマファイルを出力します。

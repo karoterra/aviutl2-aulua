@@ -7,6 +7,7 @@
     - [init](commands/init.md)
     - [build](commands/build.md)
     - [install](commands/install.md)
+    - [pack](commands/pack.md)
     - [schema](commands/schema.md)
 - [設定ファイル aulua.yaml](config.md)
 - [ビルド](build/README.md)

@@ -10,26 +10,30 @@
 ---min=-10
 ---max=10
 ---step=0.01
+---zero_label=ストップ
+---scale=0.1
 local vx = 0
 ```
 
 ビルド後
 ```lua
---track@vx:X速度,-10,10,0,0.01
+--track@vx:X速度,-10,10,0,0.01,ストップ,0.1
 ```
 
 以下のように1行で書くこともできます。
 
 ビルド前
 ```lua
----$track:X速度, min = -10, max = 10, step = 0.01
+---$track:X速度, min = -10, max = 10, step = 0.01, zero_label = ストップ, scale = 0.1
 local vx = 0
 ```
 
 ビルド後
 ```lua
---track@vx:X速度,-10,10,0,0.01
+--track@vx:X速度,-10,10,0,0.01,ストップ,0.1
 ```
+
+`step`, `zero_label`, `scale` は省略可能です。
 
 ## チェックボックス
 

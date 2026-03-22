@@ -4,7 +4,38 @@
 以下は設定ファイルのサンプルです。
 
 ```yaml:aulua.yaml
-{{#include config_example.yaml}}
+# yaml-language-server: $schema=https://raw.githubusercontent.com/karoterra/aviutl2-aulua/refs/heads/main/schema/aulua.schema.json
+
+project:
+  variables:
+    VERSION: v1.0.0
+    AUTHOR: karoterra
+
+build:
+  out_dir: build
+  embed_search_dirs:
+    - lib
+
+install:
+  out_dir: C:\ProgramData\aviutl2\Script\karoterra\
+
+scripts:
+  - name: 色覚シミュレーションKR.anm2
+    sources:
+      - path: script/色覚シミュレーションKR.in.anm2
+        variables:
+          INFO: 色覚シミュレーションKR for AviUtl2
+
+  - name: "@MyEffect.anm2"
+    sources:
+      - path: scripts/EffectA.in.anm2
+        label: EffectA
+        variables:
+          INFO: MyEffect (EffectA)
+      - path: scripts/EffectB.in.anm2
+        label: EffectB
+        variables:
+          INFO: MyEffect (EffectB)
 ```
 
 ## project
@@ -12,7 +43,10 @@
 プロジェクト全体に関する設定を指定します。
 
 ```yaml
-{{#include config_example.yaml:3:6}}
+project:
+  variables:
+    VERSION: v1.0.0
+    AUTHOR: karoterra
 ```
 
 `variables`
@@ -26,7 +60,10 @@
 ビルドに関する設定を指定します。
 
 ```yaml
-{{#include config_example.yaml:8:11}}
+build:
+  out_dir: build
+  embed_search_dirs:
+    - lib
 ```
 
 `out_dir`
@@ -41,18 +78,99 @@
 インストールに関する設定を指定します。
 
 ```yaml
-{{#include config_example.yaml:13:14}}
+install:
+  out_dir: C:\ProgramData\aviutl2\Script\karoterra\
 ```
 
 `out_dir`
   : [`install`](commands/install.md) コマンドを実行した際のスクリプトファイル出力先ディレクトリを指定します。デフォルト値は `%PROGRAMDATA%\aviutl2\Script` です（`%PROGRAMDATA%` は環境変数）。
+
+
+## package
+
+パッケージに関する設定を指定します。
+
+```yaml
+package:
+  id: karoterra.ColorVisionSimulation
+  name: 色覚シミュレーションKR
+  information: 色覚シミュレーションKR for AviUtl2 v{version}
+  version: 1.0.0
+  out_dir: build
+  file_name: "{id}-v{version}.au2pkg.zip"
+  script_sub_dir: "{id}"
+  message:
+    file: package.txt
+  assets:
+    - src: docs/README.md
+      dest: Script/{id}/docs/README.md
+```
+
+`id`
+  : パッケージの識別子を指定します。 `package.ini` に使用されます。
+
+`name`
+  : パッケージの名称を指定します。 `package.ini` に使用されます。
+
+`information`
+  : パッケージの情報を指定します。 `package.ini` に使用されます。
+
+`version`
+  : パッケージのバージョンを指定します。
+
+`out_dir`
+  : パッケージファイルの出力先ディレクトリを指定します
+    省略時は `build.out_dir` と同じ値になります。
+
+`file_name`
+  : 出力されるパッケージファイルのファイル名を指定します。
+    省略時は `"{id}-v{version}.au2pkg.zip"` （ `version` 指定時）または `"{id}.au2pkg.zip"` （ `version` 省略時）が使用されます。
+
+`script_sub_dir`
+  : ビルドしたスクリプトファイルを配置するディレクトリを指定します。
+    `Script` 直下に配置したい場合は空文字列を指定してください。
+    省略時は `"{id}"` が使用されます。
+
+`message`
+  : `package.txt` に指定するテキストを指定します。
+    ファイルを参照する場合は `message.file` にファイルのパスを指定してください。
+    テキストを直接指定する場合は `message.text` に指定してください。
+
+`assets`
+  : ビルド出力結果以外にパッケージに含めたいファイルを指定します。
+    `src` にファイルのパスを、 `dest` にパッケージ内の配置先を指定してください。
+
+`information`, `file_name`, `script_sub_dir`, `assets[].dest` では `{...}` 形式のテンプレートを使用可能です。
+
+使用可能な変数:
+- `id`
+- `name`
+- `version`
+- `project.variables` の各キー
+
 
 ## scripts
 
 ビルド・インストールの対象となるスクリプトに関する設定を指定します。
 
 ```yaml
-{{#include config_example.yaml:16:32}}
+scripts:
+  - name: 色覚シミュレーションKR.anm2
+    sources:
+      - path: script/色覚シミュレーションKR.in.anm2
+        variables:
+          INFO: 色覚シミュレーションKR for AviUtl2
+
+  - name: "@MyEffect.anm2"
+    sources:
+      - path: scripts/EffectA.in.anm2
+        label: EffectA
+        variables:
+          INFO: MyEffect (EffectA)
+      - path: scripts/EffectB.in.anm2
+        label: EffectB
+        variables:
+          INFO: MyEffect (EffectB)
 ```
 
 `[].name`

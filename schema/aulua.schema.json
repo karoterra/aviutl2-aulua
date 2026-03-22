@@ -24,6 +24,16 @@
         }
       ]
     },
+    "package": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RawPackage"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "project": {
       "anyOf": [
         {
@@ -77,6 +87,111 @@
           ]
         }
       }
+    },
+    "RawPackage": {
+      "description": "`package` セクション",
+      "type": "object",
+      "properties": {
+        "assets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RawPackageAsset"
+          }
+        },
+        "file_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "information": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "message": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RawPackageMessage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "out_dir": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "script_sub_dir": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "RawPackageAsset": {
+      "type": "object",
+      "properties": {
+        "dest": {
+          "type": "string"
+        },
+        "src": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "src",
+        "dest"
+      ]
+    },
+    "RawPackageMessage": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "file": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "file"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ]
+        }
+      ]
     },
     "RawProject": {
       "description": "`project` セクション",

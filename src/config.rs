@@ -57,6 +57,7 @@ impl RawConfig {
             name: p.name,
             information: p.information,
             version: p.version,
+            uninstall_sub_folder_file: p.uninstall_sub_folder_file.unwrap_or(false),
             out_dir: p
                 .out_dir
                 .map(|d| config_dir.join(d))
@@ -133,6 +134,7 @@ pub struct RawPackage {
     pub name: Option<String>,
     pub information: Option<String>,
     pub version: Option<String>,
+    pub uninstall_sub_folder_file: Option<bool>,
     pub out_dir: Option<String>,
     pub file_name: Option<String>,
     pub script_sub_dir: Option<String>,
@@ -323,6 +325,7 @@ impl ResolvedConfig {
             name,
             information,
             version: p.version.clone(),
+            uninstall_sub_folder_file: p.uninstall_sub_folder_file,
             out_dir: p.out_dir.clone(),
             file_name,
             script_sub_dir,
@@ -364,6 +367,7 @@ pub struct ResolvedPackage {
     pub name: Option<String>,
     pub information: Option<String>,
     pub version: Option<String>,
+    pub uninstall_sub_folder_file: bool,
     pub out_dir: PathBuf,
     pub file_name: Option<String>,
     pub script_sub_dir: Option<String>,
@@ -402,6 +406,7 @@ pub struct PackConfig {
     pub name: String,
     pub information: String,
     pub version: Option<String>,
+    pub uninstall_sub_folder_file: bool,
     pub out_dir: PathBuf,
     pub file_name: String,
     pub script_sub_dir: String,

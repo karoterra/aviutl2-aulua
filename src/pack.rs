@@ -118,8 +118,8 @@ pub fn pack_project(config: &ResolvedConfig) -> Result<PathBuf> {
 
 fn render_package_ini(pack: &PackConfig) -> String {
     format!(
-        "[package]\r\nid={}\r\nname={}\r\ninformation={}\r\n",
-        pack.id, pack.name, pack.information
+        "[package]\r\nid={}\r\nname={}\r\ninformation={}\r\nuninstallSubFolderFile={}\r\n",
+        pack.id, pack.name, pack.information, pack.uninstall_sub_folder_file as i32
     )
 }
 
@@ -353,6 +353,7 @@ mod tests {
             name: "Example".to_string(),
             information: "Example package".to_string(),
             version: Some("1.2.3".to_string()),
+            uninstall_sub_folder_file: false,
             out_dir: PathBuf::from("dist"),
             file_name: "karoterra.example-v1.2.3.au2pkg.zip".to_string(),
             script_sub_dir: "karoterra.example".to_string(),
@@ -364,7 +365,30 @@ mod tests {
 
         assert_eq!(
             ini,
-            "[package]\r\nid=karoterra.example\r\nname=Example\r\ninformation=Example package\r\n"
+            "[package]\r\nid=karoterra.example\r\nname=Example\r\ninformation=Example package\r\nuninstallSubFolderFile=0\r\n"
+        );
+    }
+
+    #[test]
+    fn render_package_ini_uninstall_sub_folder_file_is_true() {
+        let pack = PackConfig {
+            id: "karoterra.example".to_string(),
+            name: "Example".to_string(),
+            information: "Example package".to_string(),
+            version: Some("1.2.3".to_string()),
+            uninstall_sub_folder_file: true,
+            out_dir: PathBuf::from("dist"),
+            file_name: "karoterra.example-v1.2.3.au2pkg.zip".to_string(),
+            script_sub_dir: "karoterra.example".to_string(),
+            message: None,
+            assets: vec![],
+        };
+
+        let ini = render_package_ini(&pack);
+
+        assert_eq!(
+            ini,
+            "[package]\r\nid=karoterra.example\r\nname=Example\r\ninformation=Example package\r\nuninstallSubFolderFile=1\r\n"
         );
     }
 

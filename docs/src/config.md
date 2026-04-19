@@ -19,6 +19,23 @@ build:
 install:
   out_dir: C:\ProgramData\aviutl2\Script\karoterra\
 
+package:
+  id: karoterra.ColorVisionSimulation
+  name: 色覚シミュレーションKR
+  information: 色覚シミュレーションKR for AviUtl2 v{version}
+  version: 1.0.0
+  uninstall_sub_folder_file: true
+  out_dir: build
+  file_name: "{id}-v{version}.au2pkg.zip"
+  script_sub_dir: "{id}"
+  message:
+    file: package.txt
+    # text: |
+    #   aulua.yaml に直接書くこともできます。
+  assets:
+    - src: docs/README.md
+      dest: Script/{id}/docs/README.md
+
 scripts:
   - name: 色覚シミュレーションKR.anm2
     sources:
@@ -96,11 +113,14 @@ package:
   name: 色覚シミュレーションKR
   information: 色覚シミュレーションKR for AviUtl2 v{version}
   version: 1.0.0
+  uninstall_sub_folder_file: true
   out_dir: build
   file_name: "{id}-v{version}.au2pkg.zip"
   script_sub_dir: "{id}"
   message:
     file: package.txt
+    # text: |
+    #   aulua.yaml に直接書くこともできます。
   assets:
     - src: docs/README.md
       dest: Script/{id}/docs/README.md
@@ -117,6 +137,9 @@ package:
 
 `version`
   : パッケージのバージョンを指定します。
+
+`uninstall_sub_folder_file`
+  : アンインストール時のサブフォルダのファイル削除を指定します。 `package.ini` に使用されます。
 
 `out_dir`
   : パッケージファイルの出力先ディレクトリを指定します
@@ -139,6 +162,7 @@ package:
 `assets`
   : ビルド出力結果以外にパッケージに含めたいファイルを指定します。
     `src` にファイルのパスを、 `dest` にパッケージ内の配置先を指定してください。
+    配置先は `Plugin/`, `Language/` など `Script/` 以外も指定可能です。
 
 `information`, `file_name`, `script_sub_dir`, `assets[].dest` では `{...}` 形式のテンプレートを使用可能です。
 

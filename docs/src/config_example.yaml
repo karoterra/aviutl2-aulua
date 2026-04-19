@@ -18,11 +18,14 @@ package:
   name: 色覚シミュレーションKR
   information: 色覚シミュレーションKR for AviUtl2 v{version}
   version: 1.0.0
+  uninstall_sub_folder_file: true
   out_dir: build
   file_name: "{id}-v{version}.au2pkg.zip"
   script_sub_dir: "{id}"
   message:
     file: package.txt
+    # text: |
+    #   aulua.yaml に直接書くこともできます。
   assets:
     - src: docs/README.md
       dest: Script/{id}/docs/README.md

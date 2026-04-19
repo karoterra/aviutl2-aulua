@@ -144,6 +144,12 @@
             "null"
           ]
         },
+        "uninstall_sub_folder_file": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "version": {
           "type": [
             "string",

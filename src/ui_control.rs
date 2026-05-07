@@ -416,14 +416,23 @@ pub fn apply_ui_blocks(source: &str, blocks: &[UiControlBlock]) -> String {
                     scale,
                 }) = &block.meta
                 {
-                    line.push_str(&format!(
-                        ",{},{},{},{},{},{}",
+                    // NOTE: 空文字を指定するとオプションが指定されなかった時のような挙動になる
+                    let mut params = vec![
                         min.as_deref().unwrap_or_default(),
                         max.as_deref().unwrap_or_default(),
-                        block.default_value,
+                        block.default_value.as_str(),
                         step.as_deref().unwrap_or_default(),
                         zero_label.as_deref().unwrap_or_default(),
-                        scale.as_deref().unwrap_or_default()
+                        scale.as_deref().unwrap_or_default(),
+                    ];
+                    while let Some(last) = params.last()
+                        && last.is_empty()
+                    {
+                        params.pop();
+                    }
+                    line.push_str(&format!(
+                        ",{}",
+                        params.join(",")
                     ));
                 }
                 line

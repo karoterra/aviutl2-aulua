@@ -430,10 +430,7 @@ pub fn apply_ui_blocks(source: &str, blocks: &[UiControlBlock]) -> String {
                     {
                         params.pop();
                     }
-                    line.push_str(&format!(
-                        ",{}",
-                        params.join(",")
-                    ));
+                    line.push_str(&format!(",{}", params.join(",")));
                 }
                 line
             }

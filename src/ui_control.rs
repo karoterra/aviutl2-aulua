@@ -20,8 +20,8 @@ pub enum UiControlKind {
 pub enum UiControlMeta {
     Select(Vec<(String, String)>),
     Track {
-        min: String,
-        max: String,
+        min: Option<String>,
+        max: Option<String>,
         step: Option<String>,
         zero_label: Option<String>,
         scale: Option<String>,
@@ -174,16 +174,6 @@ where
     None
 }
 
-fn validate_track_options(options: &TrackOptions) -> Option<()> {
-    if options.zero_label.is_some() && options.step.is_none() {
-        return None;
-    }
-    if options.scale.is_some() && !(options.step.is_some() && options.zero_label.is_some()) {
-        return None;
-    }
-    Some(())
-}
-
 fn parse_track_header(input: &str) -> Option<(String, TrackOptions)> {
     let input = input.trim();
     if input.is_empty() {
@@ -323,8 +313,6 @@ where
         } else if line.starts_with("--") {
             lines.next();
         } else if let Some((name, value, end_offset)) = parse_assignment(line, lines) {
-            validate_track_options(&options)?;
-
             return Some(UiControlBlock {
                 kind: UiControlKind::Track,
                 label,
@@ -333,8 +321,8 @@ where
                 start_line,
                 end_line: i + end_offset,
                 meta: Some(UiControlMeta::Track {
-                    min: options.min.unwrap_or_else(|| "0".to_string()),
-                    max: options.max.unwrap_or_else(|| "100".to_string()),
+                    min: options.min,
+                    max: options.max,
                     step: options.step,
                     zero_label: options.zero_label,
                     scale: options.scale,
@@ -428,18 +416,21 @@ pub fn apply_ui_blocks(source: &str, blocks: &[UiControlBlock]) -> String {
                     scale,
                 }) = &block.meta
                 {
-                    line.push_str(&format!(",{},{},{}", min, max, block.default_value));
-                    if let Some(step) = step {
-                        line.push_str(&format!(",{step}"));
-
-                        if let Some(zero_label) = zero_label {
-                            line.push_str(&format!(",{zero_label}"));
-
-                            if let Some(scale) = scale {
-                                line.push_str(&format!(",{scale}"));
-                            }
-                        }
+                    // NOTE: 空文字を指定するとオプションが指定されなかった時のような挙動になる
+                    let mut params = vec![
+                        min.as_deref().unwrap_or_default(),
+                        max.as_deref().unwrap_or_default(),
+                        block.default_value.as_str(),
+                        step.as_deref().unwrap_or_default(),
+                        zero_label.as_deref().unwrap_or_default(),
+                        scale.as_deref().unwrap_or_default(),
+                    ];
+                    while let Some(last) = params.last()
+                        && last.is_empty()
+                    {
+                        params.pop();
                     }
+                    line.push_str(&format!(",{}", params.join(",")));
                 }
                 line
             }

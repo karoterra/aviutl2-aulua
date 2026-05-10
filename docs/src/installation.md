@@ -27,3 +27,14 @@ cargo install --locked aulua
 
 `aulua-<version>-linux-x64.tar.gz`
   : Linux 用（例： `aulua-v0.4.1-linux-x64.tar.gz`）
+
+## mise でインストール
+
+[mise](https://mise.jdx.dev/) でインストールすることもできます。
+
+```bash
+# グローバルで使う場合
+mise use -g github:karoterra/aviutl2-aulua
+# プロジェクトで使う場合
+mise use github:karoterra/aviutl2-aulua
+```

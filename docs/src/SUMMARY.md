@@ -2,6 +2,7 @@
 
 - [はじめに](README.md)
 - [インストール](installation.md)
+- [CI](ci.md)
 - [使い方](quickstart.md)
 - [コマンド](commands/README.md)
     - [init](commands/init.md)

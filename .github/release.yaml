@@ -1,0 +1,34 @@
+changelog:
+  exclude:
+    labels:
+      - duplicate
+      - invalid
+      - wontfix
+
+  categories:
+    - title: Breaking Changes
+      labels:
+        - breaking-change
+
+    - title: Features
+      labels:
+        - feat
+
+    - title: Bug Fixes
+      labels:
+        - fix
+
+    - title: Documentation
+      labels:
+        - docs
+
+    - title: Maintenance
+      labels:
+        - chore
+        - ci
+        - dependencies
+        - refactor
+
+    - title: Other Changes
+      labels:
+        - "*"

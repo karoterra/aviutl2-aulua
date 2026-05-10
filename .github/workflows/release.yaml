@@ -40,7 +40,7 @@ jobs:
         run: cargo build --release
 
       - name: Install cargo-about
-        run: cargo install --locked cargo-about
+        run: cargo install --locked cargo-about --features cli
 
       - name: Generate NOTICE.html
         run: cargo about generate about.hbs -o NOTICE.html

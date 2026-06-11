@@ -303,11 +303,6 @@ impl ResolvedConfig {
                 "package.file_name の解決結果が空文字列になりました。"
             ));
         }
-        if script_sub_dir.trim().is_empty() {
-            return Err(anyhow::anyhow!(
-                "package.script_sub_dir の解決結果が空文字列になりました。"
-            ));
-        }
 
         let assets = p
             .assets
@@ -488,5 +483,37 @@ mod tests {
 
         let output = render_package_template(input, &vars).unwrap();
         assert_eq!(output, expected);
+    }
+
+    #[test]
+    fn test_package_for_pack_script_sub_dir_is_empty() {
+        let config = ResolvedConfig {
+            project: ResolvedProject {
+                variables: HashMap::new(),
+            },
+            build: ResolvedBuild {
+                out_dir: PathBuf::new(),
+                embed_search_dirs: vec![],
+            },
+            install: ResolvedInstall {
+                out_dir: PathBuf::new(),
+            },
+            package: Some(ResolvedPackage {
+                id: Some("testpkg".to_string()),
+                name: Some("Test Package".to_string()),
+                information: Some("A test package".to_string()),
+                version: Some("1.0.0".to_string()),
+                uninstall_sub_folder_file: false,
+                out_dir: PathBuf::new(),
+                file_name: None,
+                script_sub_dir: Some("".to_string()), // 空文字列
+                message: None,
+                assets: vec![],
+            }),
+            scripts: vec![],
+            config_dir: PathBuf::from("/tmp"),
+        };
+        let result = config.package_for_pack();
+        assert!(result.is_ok());
     }
 }

@@ -51,21 +51,40 @@ local vx = 0
 
 ## チェックボックス
 
+### 通常のチェックボックス
+
 ビルド前
 ```lua
 ---$check:重力
 local grav = 0
 ---$check:速度
 local speed = false
----$checksection:重力
-local grav = false
 ```
 
 ビルド後
 ```lua
 --check@grav:重力,0
 --check@speed:速度,false
---checksection@grav:重力,false
+```
+
+### セクション毎のチェックボックス
+
+ビルド前
+```lua
+---$checksection:重力
+local grav = false
+---$checksection:速度, multi_section = true
+local speed = false
+---$checksection:加速度
+---multi_section=true
+local acc = false
+```
+
+ビルド後
+```lua
+--checksection@grav:重力,false,false
+--checksection@speed:速度,false,true
+--checksection@acc:加速度,false,true
 ```
 
 ## 色

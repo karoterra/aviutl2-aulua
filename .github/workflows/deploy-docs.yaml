@@ -25,7 +25,7 @@ jobs:
           toolchain: stable
 
       - name: Install mdBook (cargo)
-        run: cargo install --locked mdbook@0.5.2
+        run: cargo install --locked mdbook@0.5.3
 
       - name: Check mdBook version
         run: mdbook --version

@@ -26,6 +26,9 @@ pub enum UiControlMeta {
         zero_label: Option<String>,
         scale: Option<String>,
     },
+    CheckSection {
+        multi_section: bool,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -56,6 +59,15 @@ enum TrackOptionLine<'a> {
     Scale(&'a str),
 }
 
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+struct CheckSectionOptions {
+    multi_section: bool,
+}
+
+enum CheckSectionOptionLine<'a> {
+    MultiSection(&'a str),
+}
+
 pub fn parse_ui_blocks(source: &str) -> Vec<UiControlBlock> {
     let mut blocks = Vec::new();
     let mut lines = source.split("\n").enumerate().peekable();
@@ -75,8 +87,7 @@ pub fn parse_ui_blocks(source: &str) -> Vec<UiControlBlock> {
         {
             blocks.push(block);
         } else if let Some(label) = line.strip_prefix("---$checksection:")
-            && let Some(block) =
-                parse_ui_block_no_meta(UiControlKind::CheckSection, i, label, &mut lines)
+            && let Some(block) = parse_checksection_block(i, label, &mut lines)
         {
             blocks.push(block);
         } else if let Some(label) = line.strip_prefix("---$color:")
@@ -389,6 +400,104 @@ where
     None
 }
 
+fn parse_checksection_header(input: &str) -> Option<(String, CheckSectionOptions)> {
+    let input = input.trim();
+    if input.is_empty() {
+        return None;
+    }
+
+    let mut parts = input.split(',').map(|s| s.trim());
+    let label = parts.next()?.to_string();
+    if label.is_empty() {
+        return None;
+    }
+
+    let mut options = CheckSectionOptions {
+        multi_section: false,
+    };
+
+    for part in parts {
+        let (key, value) = part.split_once('=')?;
+        let key = key.trim();
+        let value = value.trim();
+
+        match key {
+            "multi_section" => {
+                if value == "true" {
+                    options.multi_section = true;
+                } else if value == "false" {
+                    options.multi_section = false;
+                } else {
+                    return None;
+                }
+            }
+            _ => return None,
+        }
+    }
+
+    Some((label, options))
+}
+
+fn parse_checksection_option_line(line: &str) -> Option<CheckSectionOptionLine<'_>> {
+    let line = line.trim();
+
+    line.strip_prefix("---multi_section=")
+        .map(|value| CheckSectionOptionLine::MultiSection(value.trim()))
+}
+
+fn apply_checksection_option_line(
+    options: &mut CheckSectionOptions,
+    line: CheckSectionOptionLine<'_>,
+) -> Option<()> {
+    match line {
+        CheckSectionOptionLine::MultiSection(value) => {
+            if value == "true" {
+                options.multi_section = true;
+            } else if value == "false" {
+                options.multi_section = false;
+            } else {
+                return None;
+            }
+        }
+    }
+    Some(())
+}
+
+fn parse_checksection_block<'a, I>(
+    start_line: usize,
+    header: &'a str,
+    lines: &mut Peekable<I>,
+) -> Option<UiControlBlock>
+where
+    I: Iterator<Item = (usize, &'a str)>,
+{
+    let (label, mut options) = parse_checksection_header(header)?;
+
+    while let Some(&(i, line)) = lines.peek() {
+        let line = line.trim();
+
+        if let Some(option_line) = parse_checksection_option_line(line) {
+            apply_checksection_option_line(&mut options, option_line)?;
+            lines.next();
+        } else if line.starts_with("--") {
+            lines.next();
+        } else if let Some((name, value, end_offset)) = parse_assignment(line, lines) {
+            return Some(UiControlBlock {
+                kind: UiControlKind::CheckSection,
+                label,
+                var_name: name,
+                default_value: value,
+                start_line,
+                end_line: i + end_offset,
+                meta: Some(UiControlMeta::CheckSection {
+                    multi_section: options.multi_section,
+                }),
+            });
+        }
+    }
+    None
+}
+
 pub fn apply_ui_blocks(source: &str, blocks: &[UiControlBlock]) -> String {
     let mut lines: Vec<String> = source.split("\n").map(|s| s.to_string()).collect();
 
@@ -441,10 +550,14 @@ pub fn apply_ui_blocks(source: &str, blocks: &[UiControlBlock]) -> String {
                 )
             }
             UiControlKind::CheckSection => {
-                format!(
+                let mut line = format!(
                     "--checksection@{}:{},{}",
                     block.var_name, block.label, block.default_value
-                )
+                );
+                if let Some(UiControlMeta::CheckSection { multi_section }) = &block.meta {
+                    line.push_str(&format!(",{}", multi_section));
+                }
+                line
             }
             UiControlKind::Color => {
                 format!(

@@ -1,0 +1,3 @@
+---$checksection:重力
+---multi_section=true
+local grav = false

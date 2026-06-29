@@ -498,6 +498,22 @@ where
     None
 }
 
+fn trim_lua_string_quotes(value: &str) -> &str {
+    let value = value.trim();
+
+    if value.len() >= 2 {
+        if let Some(stripped) = value.strip_prefix('"').and_then(|s| s.strip_suffix('"')) {
+            return stripped;
+        }
+
+        if let Some(stripped) = value.strip_prefix('\'').and_then(|s| s.strip_suffix('\'')) {
+            return stripped;
+        }
+    }
+
+    value
+}
+
 pub fn apply_ui_blocks(source: &str, blocks: &[UiControlBlock]) -> String {
     let mut lines: Vec<String> = source.split("\n").map(|s| s.to_string()).collect();
 
@@ -576,7 +592,7 @@ pub fn apply_ui_blocks(source: &str, blocks: &[UiControlBlock]) -> String {
                     "--font@{}:{},{}",
                     block.var_name,
                     block.label,
-                    block.default_value.trim_matches('"')
+                    trim_lua_string_quotes(&block.default_value)
                 )
             }
             UiControlKind::Figure => {
@@ -584,7 +600,7 @@ pub fn apply_ui_blocks(source: &str, blocks: &[UiControlBlock]) -> String {
                     "--figure@{}:{},{}",
                     block.var_name,
                     block.label,
-                    block.default_value.trim_matches('"')
+                    trim_lua_string_quotes(&block.default_value)
                 )
             }
             UiControlKind::Text => {
@@ -592,7 +608,7 @@ pub fn apply_ui_blocks(source: &str, blocks: &[UiControlBlock]) -> String {
                     "--text@{}:{},{}",
                     block.var_name,
                     block.label,
-                    block.default_value.trim_matches('"')
+                    trim_lua_string_quotes(&block.default_value)
                 )
             }
             UiControlKind::String => {
@@ -600,7 +616,7 @@ pub fn apply_ui_blocks(source: &str, blocks: &[UiControlBlock]) -> String {
                     "--string@{}:{},{}",
                     block.var_name,
                     block.label,
-                    block.default_value.trim_matches('"')
+                    trim_lua_string_quotes(&block.default_value)
                 )
             }
             UiControlKind::Value => {
@@ -623,6 +639,18 @@ mod tests {
     use rstest::rstest;
 
     use crate::{common::get_fixture_path, text_utils::read_text};
+
+    #[rstest]
+    #[case("\"text\"", "text")]
+    #[case("'text'", "text")]
+    #[case("'text\"", "'text\"")]
+    #[case("\"text'", "\"text'")]
+    #[case("text", "text")]
+    #[case("'\"text\"'", "\"text\"")]
+    fn test_trim_lua_string_quotes(#[case] input: &str, #[case] expected: &str) {
+        let result = trim_lua_string_quotes(input);
+        assert_eq!(result, expected);
+    }
 
     #[test]
     fn test_parse_ui_blocks_select() {

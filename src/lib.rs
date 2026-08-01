@@ -7,6 +7,7 @@ pub mod embed;
 pub mod include;
 pub mod init;
 pub mod install;
+pub mod language_directive;
 pub mod language_ui;
 pub mod pack;
 pub mod schema;

@@ -151,7 +151,7 @@ fn extract_built_ui_items(body: &str) -> Result<Vec<LanguageUiItem>, LanguageUiE
     Ok(items)
 }
 
-fn physical_lines(body: &str) -> impl Iterator<Item = &str> {
+pub(crate) fn physical_lines(body: &str) -> impl Iterator<Item = &str> {
     body.split_inclusive('\n').map(|line| {
         if let Some(line_without_lf) = line.strip_suffix('\n') {
             line_without_lf

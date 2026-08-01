@@ -1,0 +1,16 @@
+; ファイル先頭コメント
+
+[single]
+single=Single
+X速度=X Speed
+
+; コメント
+独自キー=Keep this
+ストップ=
+
+[Tips.single]
+effect.name=Single animation effect
+X速度=Tips for X speed
+
+[Unknown]
+foo=bar

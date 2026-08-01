@@ -1,0 +1,31 @@
+[single]
+single=
+X速度=
+ストップ=
+
+[Tips.single]
+effect.name=
+X速度=
+
+[Combined Part 1@combined]
+Combined Part 1@combined=
+装飾タイプ=
+標準文字=
+影付き文字=
+影付き文字(薄)=
+縁取り文字=
+縁取り文字(細)=
+縁取り文字(太)=
+縁取り文字(角)=
+リスト1=
+リスト2=
+選択肢2_2=
+
+[Tips.Combined Part 1@combined]
+effect.name=
+装飾タイプ=
+
+[Combined Part 2@combined]
+グループ1=
+グループ3=
+セパレータ1=

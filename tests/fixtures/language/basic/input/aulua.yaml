@@ -1,0 +1,20 @@
+build:
+  out_dir: ../build
+
+scripts:
+  - name: single.anm2
+    sources:
+      - path: single.lua
+  - name: "@combined.anm2"
+    sources:
+      - path: combined_part1.lua
+        label: Combined Part 1
+      - path: combined_part2.lua
+        label: Combined Part 2
+
+language:
+  files:
+    - path: ../build/Default.basic.aul2
+      text: false
+      tooltip: true
+    - path: ../build/English.basic.aul2

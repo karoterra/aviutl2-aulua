@@ -60,6 +60,7 @@ mod tests {
                 out_dir: tmp_dst.path().to_path_buf(),
             },
             package: None,
+            language: None,
             scripts: vec![crate::config::ResolvedScript {
                 name: script_name.to_string(),
                 sources: vec![],

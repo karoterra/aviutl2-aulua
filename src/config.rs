@@ -10,11 +10,12 @@ pub struct RawConfig {
     pub build: Option<RawBuild>,
     pub install: Option<RawInstall>,
     pub package: Option<RawPackage>,
+    pub language: Option<RawLanguage>,
     pub scripts: Vec<RawScript>,
 }
 
 impl RawConfig {
-    pub fn resolve(self, config_path: &Path) -> ResolvedConfig {
+    pub fn resolve(self, config_path: &Path) -> Result<ResolvedConfig, ConfigResolveError> {
         let config_dir = config_path
             .parent()
             .unwrap_or_else(|| Path::new("."))
@@ -80,6 +81,33 @@ impl RawConfig {
                 .collect(),
         });
 
+        let language = self
+            .language
+            .map(|language| {
+                let files = language
+                    .files
+                    .into_iter()
+                    .enumerate()
+                    .map(|(index, file)| {
+                        let text = file.text.unwrap_or(true);
+                        let tooltip = file.tooltip.unwrap_or(true);
+
+                        if !text && !tooltip {
+                            return Err(ConfigResolveError::LanguageFileDisabled { index });
+                        }
+
+                        Ok(ResolvedLanguageFile {
+                            path: config_dir.join(file.path),
+                            text,
+                            tooltip,
+                        })
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                Ok(ResolvedLanguage { files })
+            })
+            .transpose()?;
+
         let scripts = self
             .scripts
             .into_iter()
@@ -97,15 +125,22 @@ impl RawConfig {
             })
             .collect();
 
-        ResolvedConfig {
+        Ok(ResolvedConfig {
             project,
             build,
             install,
             package,
+            language,
             scripts,
             config_dir,
-        }
+        })
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ConfigResolveError {
+    #[error("language.files[{index}] の text と tooltip を両方 false にすることはできません。")]
+    LanguageFileDisabled { index: usize },
 }
 
 /// `project` セクション
@@ -125,6 +160,20 @@ pub struct RawBuild {
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct RawInstall {
     pub out_dir: Option<String>,
+}
+
+/// `language` セクション
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct RawLanguage {
+    pub files: Vec<RawLanguageFile>,
+}
+
+/// 各言語ファイルの設定
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct RawLanguageFile {
+    pub path: PathBuf,
+    pub text: Option<bool>,
+    pub tooltip: Option<bool>,
 }
 
 /// `package` セクション
@@ -178,6 +227,7 @@ pub struct ResolvedConfig {
     pub build: ResolvedBuild,
     pub install: ResolvedInstall,
     pub package: Option<ResolvedPackage>,
+    pub language: Option<ResolvedLanguage>,
     pub scripts: Vec<ResolvedScript>,
     pub config_dir: PathBuf,
 }
@@ -357,6 +407,18 @@ pub struct ResolvedInstall {
 }
 
 #[derive(Debug)]
+pub struct ResolvedLanguage {
+    pub files: Vec<ResolvedLanguageFile>,
+}
+
+#[derive(Debug)]
+pub struct ResolvedLanguageFile {
+    pub path: PathBuf,
+    pub text: bool,
+    pub tooltip: bool,
+}
+
+#[derive(Debug)]
 pub struct ResolvedPackage {
     pub id: Option<String>,
     pub name: Option<String>,
@@ -457,11 +519,12 @@ mod tests {
             }),
             install: None,
             package: None,
+            language: None,
             scripts: vec![],
         };
 
         let config_path = PathBuf::from("/tmp/project/aulua.yaml");
-        let resolved = raw.resolve(&config_path);
+        let resolved = raw.resolve(&config_path).unwrap();
 
         assert_eq!(
             resolved.build.embed_search_dirs,
@@ -510,6 +573,7 @@ mod tests {
                 message: None,
                 assets: vec![],
             }),
+            language: None,
             scripts: vec![],
             config_dir: PathBuf::from("/tmp"),
         };

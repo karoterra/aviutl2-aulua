@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use crate::config::{RawConfig, ResolvedConfig};
+use crate::config::{ConfigResolveError, RawConfig, ResolvedConfig};
 use serde_yaml_ng as yaml;
 use thiserror::Error;
 
@@ -11,6 +11,8 @@ pub enum ConfigError {
     Io(#[from] std::io::Error),
     #[error("YAMLのパースに失敗しました: {0}")]
     Parse(#[from] yaml::Error),
+    #[error("設定値が不正です: {0}")]
+    Resolve(#[from] ConfigResolveError),
 }
 
 /// `aulua.yaml` を読み込んで `Config` に変換
@@ -18,5 +20,5 @@ pub fn load_config<P: AsRef<Path>>(path: P) -> Result<ResolvedConfig, ConfigErro
     let path = path.as_ref();
     let content = fs::read_to_string(path)?;
     let config: RawConfig = yaml::from_str(&content)?;
-    Ok(config.resolve(path))
+    Ok(config.resolve(path)?)
 }

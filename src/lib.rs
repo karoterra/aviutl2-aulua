@@ -11,6 +11,7 @@ pub mod language_directive;
 pub mod language_script_entries;
 pub mod language_script_info;
 pub mod language_ui;
+pub mod logical_script_language;
 pub mod pack;
 pub mod schema;
 pub mod script_identity;

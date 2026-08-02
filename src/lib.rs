@@ -2,6 +2,8 @@ pub mod build;
 pub mod config;
 pub mod config_loader;
 pub mod configured_script;
+#[allow(dead_code)]
+pub(crate) mod configured_script_body;
 pub mod direct_script;
 pub mod embed;
 pub mod include;

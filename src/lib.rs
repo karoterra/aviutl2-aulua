@@ -15,6 +15,8 @@ pub mod language_directive;
 pub(crate) mod language_script_analysis;
 pub mod language_script_entries;
 pub mod language_script_info;
+#[allow(dead_code)]
+pub(crate) mod language_section_catalog;
 pub mod language_ui;
 pub mod logical_script_language;
 pub mod pack;

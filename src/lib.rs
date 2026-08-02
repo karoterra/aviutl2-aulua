@@ -12,6 +12,8 @@ pub mod init;
 pub mod install;
 pub mod language_directive;
 #[allow(dead_code)]
+pub(crate) mod language_file_request;
+#[allow(dead_code)]
 pub(crate) mod language_script_analysis;
 pub mod language_script_entries;
 pub mod language_script_info;

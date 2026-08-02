@@ -8,6 +8,7 @@ pub mod include;
 pub mod init;
 pub mod install;
 pub mod language_directive;
+pub mod language_script_info;
 pub mod language_ui;
 pub mod pack;
 pub mod schema;

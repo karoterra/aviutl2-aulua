@@ -15,6 +15,7 @@ pub mod logical_script_language;
 pub mod pack;
 pub mod schema;
 pub mod script_identity;
+pub(crate) mod source_processing;
 pub mod text_utils;
 pub mod ui_control;
 

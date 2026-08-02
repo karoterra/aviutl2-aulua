@@ -1,16 +1,12 @@
-use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use regex::Regex;
-
-use crate::config::{ResolvedConfig, ResolvedScript, ResolvedScriptSource};
+use crate::config::{ResolvedConfig, ResolvedScript};
 use crate::embed::process_embeds;
-use crate::include::process_includes;
-use crate::text_utils::read_text;
+use crate::source_processing::{
+    build_source_variables, expand_source_includes, expand_variables, load_source_text,
+};
 use crate::ui_control::{apply_ui_blocks, parse_ui_blocks};
-
-const RESERVED_PACKAGE_VARS: &[&str] = &["PACKAGE_ID", "PACKAGE_NAME", "PACKAGE_VERSION"];
 
 pub fn build_all(config: &ResolvedConfig, out_dir: &Path) -> anyhow::Result<()> {
     fs::create_dir_all(out_dir)?;
@@ -31,9 +27,7 @@ fn build_script(
 
     for source in &script.sources {
         let src_path = PathBuf::from(&source.path);
-        let content = read_text(&src_path).map_err(|e| {
-            anyhow::anyhow!("{} の読み込みに失敗しました: {}", src_path.display(), e)
-        })?;
+        let content = load_source_text(&src_path)?;
 
         // ラベル
         if let Some(label) = &source.label {
@@ -41,13 +35,7 @@ fn build_script(
         }
 
         // ファイルインクルード
-        let mut include_stack = Vec::new();
-        let content = process_includes(
-            &content,
-            src_path.parent().unwrap_or(Path::new("")),
-            &mut include_stack,
-        )
-        .map_err(|e| anyhow::anyhow!("{}", e))?;
+        let content = expand_source_includes(&src_path, &content)?;
 
         // 埋め込み
         let content = process_embeds(
@@ -57,10 +45,10 @@ fn build_script(
         )?;
 
         // 変数
-        let vars = build_variables_for_source(config, source)?;
-        let (content, warnings) = apply_variables(&content, &vars);
+        let variables = build_source_variables(config, source)?;
+        let expansion = expand_variables(&content, &variables);
 
-        for warning in warnings {
+        for warning in &expansion.undefined_variables {
             eprintln!(
                 "⚠️ 未定義の変数: ${} （{} 内）",
                 warning,
@@ -69,8 +57,8 @@ fn build_script(
         }
 
         // UI Control
-        let ui_blocks = parse_ui_blocks(&content);
-        let content = apply_ui_blocks(&content, &ui_blocks);
+        let ui_blocks = parse_ui_blocks(&expansion.text);
+        let content = apply_ui_blocks(&expansion.text, &ui_blocks);
 
         combined.push_str(&content);
         combined.push('\n');
@@ -81,136 +69,4 @@ fn build_script(
     println!("✅ ビルド完了: {}", out_path.display());
 
     Ok(())
-}
-
-fn ensure_no_reserved_package_vars(
-    vars: &HashMap<String, String>,
-    scope: &str,
-) -> anyhow::Result<()> {
-    for key in RESERVED_PACKAGE_VARS {
-        if vars.contains_key(*key) {
-            return Err(anyhow::anyhow!(
-                "{} に予約変数 {} を定義することはできません。",
-                scope,
-                key
-            ));
-        }
-    }
-    Ok(())
-}
-
-fn build_variables_for_source(
-    config: &ResolvedConfig,
-    source: &ResolvedScriptSource,
-) -> anyhow::Result<HashMap<String, String>> {
-    ensure_no_reserved_package_vars(&config.project.variables, "project.variables")?;
-    ensure_no_reserved_package_vars(&source.variables, "source.variables")?;
-
-    let mut vars = config.project.variables.clone();
-
-    if let Some(package) = &config.package {
-        if let Some(id) = &package.id {
-            vars.insert("PACKAGE_ID".to_string(), id.clone());
-        }
-        if let Some(name) = &package.name {
-            vars.insert("PACKAGE_NAME".to_string(), name.clone());
-        }
-        if let Some(version) = &package.version {
-            vars.insert("PACKAGE_VERSION".to_string(), version.clone());
-        }
-    }
-
-    vars.extend(source.variables.clone());
-
-    Ok(vars)
-}
-
-fn apply_variables(text: &str, vars: &HashMap<String, String>) -> (String, Vec<String>) {
-    let re = Regex::new(r"\$\{([A-Za-z0-9_]+)\}").unwrap();
-    let mut undefined_vars = HashSet::new();
-
-    let result = re.replace_all(text, |caps: &regex::Captures| {
-        let key = &caps[1];
-        match vars.get(key) {
-            Some(val) => val.to_string(),
-            None => {
-                undefined_vars.insert(key.to_string());
-                caps[0].to_string()
-            }
-        }
-    });
-
-    (result.into_owned(), undefined_vars.into_iter().collect())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::collections::HashMap;
-
-    #[test]
-    fn test_apply_variables_single() {
-        let mut vars = HashMap::new();
-        vars.insert("NAME".to_string(), "karoterra".to_string());
-
-        let input = "Hello, ${NAME}!";
-        let expected = "Hello, karoterra!";
-
-        let (actual, warnings) = apply_variables(input, &vars);
-        assert_eq!(actual, expected);
-        assert!(warnings.is_empty());
-    }
-
-    #[test]
-    fn test_apply_variables_multiple() {
-        let mut vars = HashMap::new();
-        vars.insert("FOO".to_string(), "foo".to_string());
-        vars.insert("BAR".to_string(), "bar".to_string());
-
-        let input = "This is ${FOO} and that is ${BAR}.";
-        let expected = "This is foo and that is bar.";
-
-        let (actual, warnings) = apply_variables(input, &vars);
-        assert_eq!(actual, expected);
-        assert!(warnings.is_empty());
-    }
-
-    #[test]
-    fn test_apply_variables_missing() {
-        let vars = HashMap::new();
-
-        let input = "Unresolved: ${UNKNOWN}";
-        let expected = "Unresolved: ${UNKNOWN}";
-
-        let (actual, warnings) = apply_variables(input, &vars);
-        assert_eq!(actual, expected);
-        assert_eq!(warnings, vec!["UNKNOWN"]);
-    }
-
-    #[test]
-    fn test_apply_variables_partial_overlap() {
-        let mut vars = HashMap::new();
-        vars.insert("VERSION".to_string(), "1.2.3".to_string());
-        vars.insert("VER".to_string(), "WRONG".to_string());
-
-        let input = "App version: ${VERSION}";
-        let expected = "App version: 1.2.3";
-
-        let (actual, warnings) = apply_variables(input, &vars);
-        assert_eq!(actual, expected);
-        assert!(warnings.is_empty());
-    }
-
-    #[test]
-    fn test_apply_variables_case_sensitive() {
-        let mut vars = HashMap::new();
-        vars.insert("FOO".to_string(), "X".to_string());
-
-        let input = "Test: ${foo}";
-        let expected = "Test: ${foo}";
-
-        let (actual, warnings) = apply_variables(input, &vars);
-        assert_eq!(actual, expected);
-        assert_eq!(warnings, vec!["foo"]);
-    }
 }

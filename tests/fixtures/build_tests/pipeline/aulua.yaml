@@ -1,0 +1,10 @@
+project:
+  variables:
+    INCLUDED_VALUE: included
+    MODULE_VALUE: embedded
+    UI_NAME: Track
+
+scripts:
+  - name: pipeline.obj2
+    sources:
+      - path: src/main.lua

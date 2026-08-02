@@ -6,6 +6,8 @@ pub(crate) mod configured_script_body;
 #[allow(dead_code)]
 pub(crate) mod configured_script_language;
 pub mod direct_script;
+#[allow(dead_code)]
+pub(crate) mod direct_script_language;
 pub mod embed;
 pub mod include;
 pub mod init;

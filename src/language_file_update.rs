@@ -7,9 +7,15 @@ use thiserror::Error;
 
 use crate::aul2_document_builder::build_new_aul2_document;
 use crate::aul2_parser::{ParseAul2DocumentError, parse_aul2_document};
+use crate::aul2_prune::prune_aul2_document;
 use crate::aul2_serializer::serialize_aul2_document;
 use crate::aul2_update::update_aul2_document;
 use crate::language_file_plan::LanguageFilePlan;
+
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct UpdateLanguageFilesOptions {
+    pub prune: bool,
+}
 
 #[derive(Debug, Error)]
 pub(crate) enum UpdateLanguageFilesError {
@@ -61,10 +67,11 @@ pub(crate) enum UpdateLanguageFilesError {
 
 pub(crate) fn update_language_files(
     plans: &[LanguageFilePlan],
+    options: UpdateLanguageFilesOptions,
 ) -> Result<(), UpdateLanguageFilesError> {
     let prepared = plans
         .iter()
-        .map(prepare_language_file_update)
+        .map(|plan| prepare_language_file_update(plan, options))
         .collect::<Result<Vec<_>, _>>()?;
 
     for update in prepared.iter().filter(|update| update.needs_write) {
@@ -84,6 +91,7 @@ struct PreparedLanguageFileUpdate {
 
 fn prepare_language_file_update(
     plan: &LanguageFilePlan,
+    options: UpdateLanguageFilesOptions,
 ) -> Result<PreparedLanguageFileUpdate, UpdateLanguageFilesError> {
     let path = &plan.request.path;
 
@@ -96,6 +104,9 @@ fn prepare_language_file_update(
                 }
             })?;
             update_aul2_document(&mut document, plan);
+            if options.prune {
+                prune_aul2_document(&mut document, plan);
+            }
             let content = serialize_aul2_document(&document);
             let needs_write = content != original;
 
@@ -232,7 +243,7 @@ mod tests {
             plan(&empty_path, Vec::new()),
         ];
 
-        update_language_files(&plans).unwrap();
+        update_language_files(&plans, UpdateLanguageFilesOptions::default()).unwrap();
 
         assert_eq!(
             fs::read_to_string(nonempty_path).unwrap(),
@@ -246,8 +257,11 @@ mod tests {
         let temp = TempDir::new().unwrap();
         let path = temp.path().join("nested/deep/English.aul2");
 
-        update_language_files(&[plan(&path, vec![text_section("section", [("key", "")])])])
-            .unwrap();
+        update_language_files(
+            &[plan(&path, vec![text_section("section", [("key", "")])])],
+            UpdateLanguageFilesOptions::default(),
+        )
+        .unwrap();
 
         assert_eq!(fs::read_to_string(path).unwrap(), "[section]\nkey=\n");
     }
@@ -271,7 +285,7 @@ mod tests {
         let mut file_plan = language_plan.files[0].clone();
         file_plan.request.path = path.clone();
 
-        update_language_files(&[file_plan]).unwrap();
+        update_language_files(&[file_plan], UpdateLanguageFilesOptions::default()).unwrap();
 
         assert_eq!(
             fs::read_to_string(path).unwrap(),
@@ -288,8 +302,11 @@ mod tests {
         let path = temp.path().join("English.aul2");
         fs::write(&path, "").unwrap();
 
-        update_language_files(&[plan(&path, vec![text_section("section", [("key", "")])])])
-            .unwrap();
+        update_language_files(
+            &[plan(&path, vec![text_section("section", [("key", "")])])],
+            UpdateLanguageFilesOptions::default(),
+        )
+        .unwrap();
 
         assert_eq!(fs::read_to_string(path).unwrap(), "[section]\nkey=");
     }
@@ -301,7 +318,11 @@ mod tests {
         let original = "[broken\nkey=value\n";
         fs::write(&path, original).unwrap();
 
-        let error = update_language_files(&[plan(&path, Vec::new())]).unwrap_err();
+        let error = update_language_files(
+            &[plan(&path, Vec::new())],
+            UpdateLanguageFilesOptions::default(),
+        )
+        .unwrap_err();
 
         assert!(matches!(
             error,
@@ -328,7 +349,7 @@ mod tests {
         ];
 
         assert!(matches!(
-            update_language_files(&plans),
+            update_language_files(&plans, UpdateLanguageFilesOptions::default()),
             Err(UpdateLanguageFilesError::Parse { path, .. }) if path == second_path
         ));
         assert_eq!(fs::read_to_string(first_path).unwrap(), first_original);
@@ -342,7 +363,11 @@ mod tests {
         let original = [0xff, 0xfe];
         fs::write(&path, original).unwrap();
 
-        let error = update_language_files(&[plan(&path, Vec::new())]).unwrap_err();
+        let error = update_language_files(
+            &[plan(&path, Vec::new())],
+            UpdateLanguageFilesOptions::default(),
+        )
+        .unwrap_err();
 
         assert!(matches!(
             error,
@@ -357,10 +382,13 @@ mod tests {
         let path = temp.path().join("English.aul2");
         fs::write(&path, "\u{feff}[section]\r\nkey=value\r\n").unwrap();
 
-        update_language_files(&[plan(
-            &path,
-            vec![text_section("section", [("key", "different")])],
-        )])
+        update_language_files(
+            &[plan(
+                &path,
+                vec![text_section("section", [("key", "different")])],
+            )],
+            UpdateLanguageFilesOptions::default(),
+        )
         .unwrap();
 
         assert_eq!(fs::read_to_string(path).unwrap(), "[section]\nkey=value\n");
@@ -374,7 +402,9 @@ mod tests {
         fs::write(&path, original).unwrap();
         let file_plan = plan(&path, vec![text_section("section", [("key", "different")])]);
 
-        let prepared = prepare_language_file_update(&file_plan).unwrap();
+        let prepared =
+            prepare_language_file_update(&file_plan, UpdateLanguageFilesOptions::default())
+                .unwrap();
 
         assert_eq!(prepared.content, original);
         assert!(!prepared.needs_write);
@@ -387,7 +417,11 @@ mod tests {
         let target_path = blocking_path.join("English.aul2");
         fs::write(&blocking_path, "not a directory").unwrap();
 
-        let error = update_language_files(&[plan(&target_path, Vec::new())]).unwrap_err();
+        let error = update_language_files(
+            &[plan(&target_path, Vec::new())],
+            UpdateLanguageFilesOptions::default(),
+        )
+        .unwrap_err();
 
         assert!(matches!(
             error,
@@ -396,6 +430,165 @@ mod tests {
         assert_eq!(
             fs::read_to_string(blocking_path).unwrap(),
             "not a directory"
+        );
+    }
+
+    #[test]
+    fn prune_adds_missing_entry_removes_unused_and_keeps_existing_value() {
+        let temp = TempDir::new().unwrap();
+        let path = temp.path().join("English.aul2");
+        fs::write(&path, "[section]\nrequired=translated\nold=unused\n").unwrap();
+        let file_plan = plan(
+            &path,
+            vec![text_section(
+                "section",
+                [("required", "different"), ("missing", "")],
+            )],
+        );
+
+        update_language_files(&[file_plan], UpdateLanguageFilesOptions { prune: true }).unwrap();
+
+        assert_eq!(
+            fs::read_to_string(path).unwrap(),
+            "[section]\nrequired=translated\nmissing=\n"
+        );
+    }
+
+    #[test]
+    fn prune_preserves_comments_blanks_and_unknown_sections() {
+        let temp = TempDir::new().unwrap();
+        let path = temp.path().join("English.aul2");
+        fs::write(
+            &path,
+            "[section]\nrequired=value\n; keep\nold=unused\n\n[Unknown]\nold=keep\n",
+        )
+        .unwrap();
+
+        update_language_files(
+            &[plan(
+                &path,
+                vec![text_section("section", [("required", "different")])],
+            )],
+            UpdateLanguageFilesOptions { prune: true },
+        )
+        .unwrap();
+
+        assert_eq!(
+            fs::read_to_string(path).unwrap(),
+            "[section]\nrequired=value\n; keep\n\n[Unknown]\nold=keep\n"
+        );
+    }
+
+    #[test]
+    fn missing_files_have_identical_content_with_or_without_prune() {
+        let temp = TempDir::new().unwrap();
+        let normal_path = temp.path().join("Normal.aul2");
+        let pruned_path = temp.path().join("Pruned.aul2");
+        let normal_empty_path = temp.path().join("NormalEmpty.aul2");
+        let pruned_empty_path = temp.path().join("PrunedEmpty.aul2");
+
+        update_language_files(
+            &[plan(
+                &normal_path,
+                vec![text_section("section", [("key", "value")])],
+            )],
+            UpdateLanguageFilesOptions::default(),
+        )
+        .unwrap();
+        update_language_files(
+            &[plan(
+                &pruned_path,
+                vec![text_section("section", [("key", "value")])],
+            )],
+            UpdateLanguageFilesOptions { prune: true },
+        )
+        .unwrap();
+        update_language_files(
+            &[plan(&normal_empty_path, Vec::new())],
+            UpdateLanguageFilesOptions::default(),
+        )
+        .unwrap();
+        update_language_files(
+            &[plan(&pruned_empty_path, Vec::new())],
+            UpdateLanguageFilesOptions { prune: true },
+        )
+        .unwrap();
+
+        assert_eq!(
+            fs::read_to_string(normal_path).unwrap(),
+            fs::read_to_string(pruned_path).unwrap()
+        );
+        assert_eq!(fs::read_to_string(normal_empty_path).unwrap(), "");
+        assert_eq!(fs::read_to_string(pruned_empty_path).unwrap(), "");
+    }
+
+    #[test]
+    fn prune_only_difference_controls_needs_write() {
+        let temp = TempDir::new().unwrap();
+        let path = temp.path().join("English.aul2");
+        let original = "[section]\nrequired=value\nold=unused\n";
+        fs::write(&path, original).unwrap();
+        let file_plan = plan(
+            &path,
+            vec![text_section("section", [("required", "different")])],
+        );
+
+        let normal =
+            prepare_language_file_update(&file_plan, UpdateLanguageFilesOptions::default())
+                .unwrap();
+        let pruned =
+            prepare_language_file_update(&file_plan, UpdateLanguageFilesOptions { prune: true })
+                .unwrap();
+
+        assert_eq!(normal.content, original);
+        assert!(!normal.needs_write);
+        assert_eq!(pruned.content, "[section]\nrequired=value\n");
+        assert!(pruned.needs_write);
+    }
+
+    #[test]
+    fn prune_preflight_keeps_all_files_unchanged_on_later_parse_error() {
+        let temp = TempDir::new().unwrap();
+        let first_path = temp.path().join("First.aul2");
+        let second_path = temp.path().join("Second.aul2");
+        let first_original = "[section]\nrequired=value\nold=unused\n";
+        let second_original = "[broken";
+        fs::write(&first_path, first_original).unwrap();
+        fs::write(&second_path, second_original).unwrap();
+        let plans = [
+            plan(
+                &first_path,
+                vec![text_section("section", [("required", "different")])],
+            ),
+            plan(&second_path, Vec::new()),
+        ];
+
+        assert!(matches!(
+            update_language_files(&plans, UpdateLanguageFilesOptions { prune: true }),
+            Err(UpdateLanguageFilesError::Parse { path, .. }) if path == second_path
+        ));
+        assert_eq!(fs::read_to_string(first_path).unwrap(), first_original);
+        assert_eq!(fs::read_to_string(second_path).unwrap(), second_original);
+    }
+
+    #[test]
+    fn prune_preserves_missing_final_newline() {
+        let temp = TempDir::new().unwrap();
+        let path = temp.path().join("English.aul2");
+        fs::write(&path, "[section]\nrequired=value\nold=unused").unwrap();
+
+        update_language_files(
+            &[plan(
+                &path,
+                vec![text_section("section", [("required", "different")])],
+            )],
+            UpdateLanguageFilesOptions { prune: true },
+        )
+        .unwrap();
+
+        assert_eq!(
+            fs::read_to_string(path).unwrap(),
+            "[section]\nrequired=value"
         );
     }
 }

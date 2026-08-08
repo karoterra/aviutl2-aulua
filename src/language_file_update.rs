@@ -417,11 +417,7 @@ mod tests {
         let target_path = blocking_path.join("English.aul2");
         fs::write(&blocking_path, "not a directory").unwrap();
 
-        let error = update_language_files(
-            &[plan(&target_path, Vec::new())],
-            UpdateLanguageFilesOptions::default(),
-        )
-        .unwrap_err();
+        let error = create_parent_directory(&target_path).unwrap_err();
 
         assert!(matches!(
             error,

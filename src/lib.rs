@@ -24,6 +24,7 @@ pub mod embed;
 pub mod include;
 pub mod init;
 pub mod install;
+pub mod language;
 pub mod language_directive;
 #[allow(dead_code)]
 pub(crate) mod language_file_check;

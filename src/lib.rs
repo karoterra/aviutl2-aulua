@@ -16,6 +16,8 @@ pub(crate) mod language_file_plan;
 #[allow(dead_code)]
 pub(crate) mod language_file_request;
 #[allow(dead_code)]
+pub(crate) mod language_plan;
+#[allow(dead_code)]
 pub(crate) mod language_script_analysis;
 pub mod language_script_entries;
 pub mod language_script_info;

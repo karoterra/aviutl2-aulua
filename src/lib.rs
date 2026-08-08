@@ -1,4 +1,6 @@
 #[allow(dead_code)]
+pub(crate) mod aul2_check;
+#[allow(dead_code)]
 pub(crate) mod aul2_document;
 #[allow(dead_code)]
 pub(crate) mod aul2_document_builder;

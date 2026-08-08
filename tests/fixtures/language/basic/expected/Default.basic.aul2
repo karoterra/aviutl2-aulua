@@ -1,0 +1,7 @@
+[Tips.single]
+effect.name=アニメーション効果「single」のツールチップ。\nツールチップは改行可能。\nハイフンとコロンの間のスペースの個数は任意。
+X速度=UI項目「X速度」のツールチップ。\nツールチップは改行可能。\nハイフンとコロンの間のスペースの個数は任意。
+
+[Tips.Combined Part 1@combined]
+effect.name=アニメーション効果「Combined Part 1@combined」のツールチップ。
+装飾タイプ=UI項目「装飾タイプ」のツールチップ。

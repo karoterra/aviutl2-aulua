@@ -1,0 +1,11 @@
+build:
+  out_dir: ../build
+
+scripts:
+  - name: single.anm2
+    sources:
+      - path: single.lua
+
+language:
+  files:
+    - path: English.basic.aul2

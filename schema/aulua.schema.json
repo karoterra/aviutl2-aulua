@@ -24,6 +24,16 @@
         }
       ]
     },
+    "language": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RawLanguage"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "package": {
       "anyOf": [
         {
@@ -87,6 +97,45 @@
           ]
         }
       }
+    },
+    "RawLanguage": {
+      "description": "`language` セクション",
+      "type": "object",
+      "properties": {
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RawLanguageFile"
+          }
+        }
+      },
+      "required": [
+        "files"
+      ]
+    },
+    "RawLanguageFile": {
+      "description": "各言語ファイルの設定",
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "text": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "tooltip": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "path"
+      ]
     },
     "RawPackage": {
       "description": "`package` セクション",

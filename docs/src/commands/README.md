@@ -8,4 +8,5 @@
 - [`aulua build`](build.md) --- スクリプトファイルをビルドします。
 - [`aulua install`](install.md) --- スクリプトファイルをインストールします。
 - [`aulua pack`](pack.md) --- au2pkg パッケージを作成します。
+- [`aulua language`](language.md) --- 言語ファイルを作成・更新・検査します。
 - [`aulua schema`](schema.md) --- `aulua.yaml` のスキーマファイルを出力します。

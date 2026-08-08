@@ -6,3 +6,5 @@
 *.scn2 text eol=lf linguist-language=Lua
 *.cam2 text eol=lf linguist-language=Lua
 *.tra2 text eol=lf linguist-language=Lua
+
+*.aul2 text eol=lf linguist-language=ini

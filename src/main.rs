@@ -1,11 +1,13 @@
 use std::path::PathBuf;
+use std::process::ExitCode;
 
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 
 use aulua::build::build_all;
 use aulua::config_loader::load_config;
 use aulua::init::init_project;
 use aulua::install::install_all;
+use aulua::language::{LanguageCheckStatus, check_language, update_language};
 use aulua::pack::pack_project;
 use aulua::schema::generate_config_schema;
 
@@ -28,6 +30,8 @@ enum Commands {
     },
     /// au2pkg パッケージを作成する
     Pack,
+    /// language fileを管理する
+    Language(LanguageArgs),
     /// auluaプロジェクトを作成する
     Init {
         /// プロジェクトを作成するフォルダを指定する
@@ -42,13 +46,51 @@ enum Commands {
     },
 }
 
-fn main() {
+#[derive(Args)]
+struct LanguageArgs {
+    #[command(subcommand)]
+    command: LanguageCommand,
+}
+
+#[derive(Subcommand)]
+enum LanguageCommand {
+    /// language fileを作成・更新する
+    Update(LanguageUpdateArgs),
+    /// language fileをcheckする
+    Check(LanguageCheckArgs),
+}
+
+#[derive(Args)]
+struct LanguageUpdateArgs {
+    /// 解析するbuild済みスクリプトを指定する
+    #[arg(long, value_name = "path")]
+    script: Vec<PathBuf>,
+    /// 更新するlanguage fileを上書き指定する
+    #[arg(long, value_name = "path")]
+    output: Option<PathBuf>,
+    /// 使用されていないkeyを削除する
+    #[arg(long)]
+    prune: bool,
+}
+
+#[derive(Args)]
+struct LanguageCheckArgs {
+    /// 解析するbuild済みスクリプトを指定する
+    #[arg(long, value_name = "path")]
+    script: Vec<PathBuf>,
+    /// checkするlanguage fileを上書き指定する
+    #[arg(long, value_name = "path")]
+    target: Option<PathBuf>,
+}
+
+fn main() -> ExitCode {
     let cli = Cli::parse();
 
     match cli.command {
         Commands::Build => {
             let config = load_config("aulua.yaml").expect("設定ファイルの読み込みに失敗しました");
             build_all(&config, &config.build_out_dir()).expect("ビルド処理に失敗しました");
+            ExitCode::SUCCESS
         }
         Commands::Install { dry_run } => {
             let config = load_config("aulua.yaml").expect("設定ファイルの読み込みに失敗しました");
@@ -59,16 +101,157 @@ fn main() {
                 dry_run,
             )
             .expect("インストールに失敗しました");
+            ExitCode::SUCCESS
         }
         Commands::Pack => {
             let config = load_config("aulua.yaml").expect("設定ファイルの読み込みに失敗しました");
             pack_project(&config).expect("パッケージ作成に失敗しました");
+            ExitCode::SUCCESS
+        }
+        Commands::Language(LanguageArgs {
+            command: LanguageCommand::Update(args),
+        }) => {
+            update_language(&args.script, args.output.as_deref(), args.prune)
+                .expect("language fileの更新に失敗しました");
+            ExitCode::SUCCESS
+        }
+        Commands::Language(LanguageArgs {
+            command: LanguageCommand::Check(args),
+        }) => {
+            let status = check_language(&args.script, args.target.as_deref())
+                .expect("language fileのcheckに失敗しました");
+            match status {
+                LanguageCheckStatus::Clean => ExitCode::SUCCESS,
+                LanguageCheckStatus::Findings => ExitCode::from(1),
+            }
         }
         Commands::Init { dir } => {
             init_project(&dir).expect("プロジェクトの初期化に失敗しました");
+            ExitCode::SUCCESS
         }
         Commands::Schema { output } => {
             generate_config_schema(&output).expect("スキーマ生成に失敗しました");
+            ExitCode::SUCCESS
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse_update(args: &[&str]) -> LanguageUpdateArgs {
+        let cli = Cli::try_parse_from(args).unwrap();
+        let Commands::Language(LanguageArgs {
+            command: LanguageCommand::Update(args),
+        }) = cli.command
+        else {
+            panic!("language updateとしてparseされませんでした");
+        };
+        args
+    }
+
+    fn parse_check(args: &[&str]) -> LanguageCheckArgs {
+        let cli = Cli::try_parse_from(args).unwrap();
+        let Commands::Language(LanguageArgs {
+            command: LanguageCommand::Check(args),
+        }) = cli.command
+        else {
+            panic!("language checkとしてparseされませんでした");
+        };
+        args
+    }
+
+    #[test]
+    fn parses_language_update_with_defaults() {
+        let args = parse_update(&["aulua", "language", "update"]);
+
+        assert!(args.script.is_empty());
+        assert_eq!(args.output, None);
+        assert!(!args.prune);
+    }
+
+    #[test]
+    fn parses_repeated_scripts_in_order() {
+        let args = parse_update(&[
+            "aulua", "language", "update", "--script", "a.anm2", "--script", "b.obj2",
+        ]);
+
+        assert_eq!(
+            args.script,
+            vec![PathBuf::from("a.anm2"), PathBuf::from("b.obj2")]
+        );
+    }
+
+    #[test]
+    fn parses_output_override() {
+        let args = parse_update(&[
+            "aulua",
+            "language",
+            "update",
+            "--output",
+            "Language/English.aul2",
+        ]);
+
+        assert_eq!(args.output, Some(PathBuf::from("Language/English.aul2")));
+    }
+
+    #[test]
+    fn parses_prune_flag() {
+        let args = parse_update(&["aulua", "language", "update", "--prune"]);
+
+        assert!(args.prune);
+    }
+
+    #[test]
+    fn rejects_language_update_options_on_other_commands() {
+        assert!(Cli::try_parse_from(["aulua", "build", "--prune"]).is_err());
+        assert!(Cli::try_parse_from(["aulua", "pack", "--output", "English.aul2"]).is_err());
+    }
+
+    #[test]
+    fn parses_language_check_with_defaults() {
+        let args = parse_check(&["aulua", "language", "check"]);
+
+        assert!(args.script.is_empty());
+        assert_eq!(args.target, None);
+    }
+
+    #[test]
+    fn parses_repeated_check_scripts_in_order() {
+        let args = parse_check(&[
+            "aulua", "language", "check", "--script", "a.anm2", "--script", "b.obj2",
+        ]);
+
+        assert_eq!(
+            args.script,
+            vec![PathBuf::from("a.anm2"), PathBuf::from("b.obj2")]
+        );
+    }
+
+    #[test]
+    fn parses_target_override() {
+        let args = parse_check(&[
+            "aulua",
+            "language",
+            "check",
+            "--target",
+            "Language/English.aul2",
+        ]);
+
+        assert_eq!(args.target, Some(PathBuf::from("Language/English.aul2")));
+    }
+
+    #[test]
+    fn keeps_update_and_check_options_isolated() {
+        assert!(
+            Cli::try_parse_from(["aulua", "language", "check", "--output", "English.aul2"])
+                .is_err()
+        );
+        assert!(Cli::try_parse_from(["aulua", "language", "check", "--prune"]).is_err());
+        assert!(
+            Cli::try_parse_from(["aulua", "language", "update", "--target", "English.aul2"])
+                .is_err()
+        );
     }
 }

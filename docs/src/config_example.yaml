@@ -30,6 +30,13 @@ package:
     - src: docs/README.md
       dest: Script/{id}/docs/README.md
 
+language:
+  files:
+    - path: Language/Default.ColorVisionSimulation.aul2
+      text: false
+      tooltip: true
+    - path: Language/English.ColorVisionSimulation.aul2
+
 scripts:
   - name: 色覚シミュレーションKR.anm2
     sources:

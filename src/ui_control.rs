@@ -69,10 +69,21 @@ enum CheckSectionOptionLine<'a> {
 }
 
 pub fn parse_ui_blocks(source: &str) -> Vec<UiControlBlock> {
+    parse_ui_blocks_internal(source, false)
+}
+
+pub(crate) fn parse_ui_blocks_at_line_start(source: &str) -> Vec<UiControlBlock> {
+    parse_ui_blocks_internal(source, true)
+}
+
+fn parse_ui_blocks_internal(source: &str, require_line_start: bool) -> Vec<UiControlBlock> {
     let mut blocks = Vec::new();
     let mut lines = source.split("\n").enumerate().peekable();
 
     while let Some((i, line)) = lines.next() {
+        if require_line_start && !line.starts_with("---$") {
+            continue;
+        }
         let line = line.trim();
         if let Some(label) = line.strip_prefix("---$select:")
             && let Some(block) = parse_select_block(i, label, &mut lines)
@@ -370,6 +381,8 @@ where
                 end_line: i + end_offset,
                 meta: None,
             });
+        } else {
+            break;
         }
     }
     None
@@ -493,6 +506,8 @@ where
                     multi_section: options.multi_section,
                 }),
             });
+        } else {
+            break;
         }
     }
     None
@@ -680,6 +695,17 @@ local eye = 1
         } else {
             panic!("Exptected Select");
         }
+    }
+
+    #[test]
+    fn test_parse_ui_blocks_still_accepts_indented_directive() {
+        let src = " ---$check:Indented\nlocal value = false\n";
+
+        let blocks = parse_ui_blocks(src);
+
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].kind, UiControlKind::Check);
+        assert_eq!(blocks[0].label, "Indented");
     }
 
     #[rstest]

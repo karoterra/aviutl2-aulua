@@ -8,7 +8,8 @@ use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipWriter};
 
 use crate::build::build_all;
-use crate::config::{PackConfig, ResolvedConfig, ResolvedPackageMessage};
+use crate::config::{PackConfig, ResolvedConfig, ResolvedLanguageFile, ResolvedPackageMessage};
+use crate::language_file_request::validate_language_file_path;
 
 const INSTALL_ROOT_DIRS: &[&str] = &[
     "Plugin",
@@ -87,6 +88,11 @@ pub fn pack_project(config: &ResolvedConfig) -> Result<PathBuf> {
         )?;
     }
 
+    // language.files
+    if let Some(language) = &config.language {
+        add_language_files(&mut zip, &mut seen_paths, &language.files, options)?;
+    }
+
     // package.assets
     for asset in &pack.assets {
         if !asset.src.exists() {
@@ -114,6 +120,23 @@ pub fn pack_project(config: &ResolvedConfig) -> Result<PathBuf> {
     println!("✅ パッケージ作成完了: {}", out_path.display());
 
     Ok(out_path)
+}
+
+fn add_language_files<W: Write + Seek>(
+    zip: &mut ZipWriter<W>,
+    seen_paths: &mut HashSet<String>,
+    files: &[ResolvedLanguageFile],
+    options: SimpleFileOptions,
+) -> Result<()> {
+    for file in files {
+        let file_name = validate_language_file_path(&file.path)?;
+        let archive_path = join_archive_paths(&["Language", file_name])?;
+        validate_install_archive_path(&archive_path)?;
+
+        add_file_to_zip(zip, seen_paths, &file.path, &archive_path, options)?;
+    }
+
+    Ok(())
 }
 
 fn render_package_ini(pack: &PackConfig) -> String {

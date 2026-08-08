@@ -1,0 +1,11 @@
+local included = "included"
+
+
+-- aulua embed: module
+local function __aulua_embed_1__()
+return { value = "embedded" }
+
+end
+local module = __aulua_embed_1__()
+
+--track@value:Track,,,1

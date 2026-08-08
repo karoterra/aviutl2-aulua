@@ -1,0 +1,12 @@
+project:
+  variables:
+    DESCRIPTION: Expanded tips
+    GENERATED_DIRECTIVE: "---$nolang: name"
+
+scripts:
+  - name: "@combined.obj2"
+    sources:
+      - path: src/first.lua
+        label: First
+      - path: src/second.lua
+        label: Second

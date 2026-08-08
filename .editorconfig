@@ -15,6 +15,10 @@ indent_style = space
 indent_size = 4
 insert_final_newline = false
 
+[*.aul2]
+indent_style = space
+indent_size = 2
+
 [*.yaml]
 indent_style = space
 indent_size = 2

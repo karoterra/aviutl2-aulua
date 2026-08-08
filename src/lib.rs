@@ -2,6 +2,8 @@
 pub(crate) mod aul2_document;
 #[allow(dead_code)]
 pub(crate) mod aul2_parser;
+#[allow(dead_code)]
+pub(crate) mod aul2_serializer;
 pub mod build;
 pub mod config;
 pub mod config_loader;

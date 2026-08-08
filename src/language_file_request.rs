@@ -57,6 +57,43 @@ pub(crate) enum ResolveLanguageFileRequestsError {
     },
 }
 
+#[derive(Debug, Error, PartialEq, Eq)]
+pub(crate) enum ValidateLanguageFilePathError {
+    #[error(
+        "language file pathの拡張子が.aul2ではありません: {}",
+        path.display()
+    )]
+    InvalidExtension { path: PathBuf },
+    #[error(
+        "language file pathのfile nameがUTF-8ではありません: {}",
+        path.display()
+    )]
+    NonUtf8FileName { path: PathBuf },
+}
+
+pub(crate) fn validate_language_file_path(
+    path: &Path,
+) -> Result<&str, ValidateLanguageFilePathError> {
+    let Some(file_name) = path.file_name() else {
+        return Err(ValidateLanguageFilePathError::InvalidExtension {
+            path: path.to_path_buf(),
+        });
+    };
+    let Some(file_name) = file_name.to_str() else {
+        return Err(ValidateLanguageFilePathError::NonUtf8FileName {
+            path: path.to_path_buf(),
+        });
+    };
+
+    if path.extension() != Some(OsStr::new("aul2")) {
+        return Err(ValidateLanguageFilePathError::InvalidExtension {
+            path: path.to_path_buf(),
+        });
+    }
+
+    Ok(file_name)
+}
+
 pub(crate) fn resolve_language_file_requests(
     config: &ResolvedConfig,
     selection: LanguageFileSelection<'_>,
@@ -66,7 +103,7 @@ pub(crate) fn resolve_language_file_requests(
         LanguageFileSelection::Override(path) => {
             let path = resolve_override_path(&config.config_dir, path);
             let origin = LanguageFileRequestOrigin::Override;
-            let is_default = validate_language_file_path(&path, origin)?;
+            let is_default = validate_request_language_file_path(&path, origin)?;
 
             Ok(vec![LanguageFileRequest {
                 path,
@@ -96,7 +133,7 @@ fn resolve_configured_requests(
         .enumerate()
         .map(|(index, file)| {
             let origin = LanguageFileRequestOrigin::Configured { index };
-            let is_default = validate_language_file_path(&file.path, origin)?;
+            let is_default = validate_request_language_file_path(&file.path, origin)?;
 
             Ok(LanguageFileRequest {
                 path: file.path.clone(),
@@ -120,29 +157,18 @@ fn resolve_override_path(config_dir: &Path, path: &Path) -> PathBuf {
     }
 }
 
-fn validate_language_file_path(
+fn validate_request_language_file_path(
     path: &Path,
     origin: LanguageFileRequestOrigin,
 ) -> Result<bool, ResolveLanguageFileRequestsError> {
-    let Some(file_name) = path.file_name() else {
-        return Err(ResolveLanguageFileRequestsError::InvalidExtension {
-            path: path.to_path_buf(),
-            origin,
-        });
-    };
-    let Some(file_name) = file_name.to_str() else {
-        return Err(ResolveLanguageFileRequestsError::NonUtf8FileName {
-            path: path.to_path_buf(),
-            origin,
-        });
-    };
-
-    if path.extension() != Some(OsStr::new("aul2")) {
-        return Err(ResolveLanguageFileRequestsError::InvalidExtension {
-            path: path.to_path_buf(),
-            origin,
-        });
-    }
+    let file_name = validate_language_file_path(path).map_err(|error| match error {
+        ValidateLanguageFilePathError::InvalidExtension { path } => {
+            ResolveLanguageFileRequestsError::InvalidExtension { path, origin }
+        }
+        ValidateLanguageFilePathError::NonUtf8FileName { path } => {
+            ResolveLanguageFileRequestsError::NonUtf8FileName { path, origin }
+        }
+    })?;
 
     Ok(is_default_file_name(file_name))
 }

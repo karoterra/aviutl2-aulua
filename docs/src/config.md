@@ -36,6 +36,13 @@ package:
     - src: docs/README.md
       dest: Script/{id}/docs/README.md
 
+language:
+  files:
+    - path: Language/Default.ColorVisionSimulation.aul2
+      text: false
+      tooltip: true
+    - path: Language/English.ColorVisionSimulation.aul2
+
 scripts:
   - name: 色覚シミュレーションKR.anm2
     sources:
@@ -171,6 +178,37 @@ package:
 - `name`
 - `version`
 - `project.variables` の各キー
+
+
+## language
+
+言語ファイルの生成・更新・検査に関する設定を指定します。
+
+```yaml
+language:
+  files:
+    - path: Language/Default.example.aul2
+      text: false
+      tooltip: true
+    - path: Language/English.example.aul2
+```
+
+`files`
+  : 管理する言語ファイルを配列で指定します。設定されたファイルを使用して`language update`または`language check`を実行する場合は、1件以上必要です。
+
+`files[].path`
+  : 言語ファイルのパスを指定します。相対パスは`aulua.yaml`があるディレクトリを基準に解決されます。
+    ファイルの拡張子は大文字小文字を区別し、小文字の`.aul2`である必要があります。ファイル名はUTF-8文字列として扱える必要があります。
+
+`files[].text`
+  : `true`の場合、通常翻訳セクションを更新・検査・削除の対象にします。デフォルト値は`true`です。
+
+`files[].tooltip`
+  : `true`の場合、Tipsセクションを更新・検査・削除の対象にします。デフォルト値は`true`です。
+
+`text`と`tooltip`の両方を`false`にすることはできず、設定エラーになります。完全に同じ設定パスのファイルを複数回指定した場合は`aulua language`コマンドでエラーになります。
+
+言語ファイルの形式や作業手順については[言語ファイル](language/)、コマンドについては[`aulua language`](commands/language.md)を参照してください。
 
 
 ## scripts

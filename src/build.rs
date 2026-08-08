@@ -1,8 +1,11 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use anyhow::Context;
+
 use crate::config::{ResolvedConfig, ResolvedScript};
 use crate::embed::process_embeds;
+use crate::language_directive::remove_language_directives;
 use crate::source_processing::{
     build_source_variables, expand_source_includes, expand_variables, load_source_text,
 };
@@ -56,9 +59,16 @@ fn build_script(
             );
         }
 
+        let content = remove_language_directives(&expansion.text).with_context(|| {
+            format!(
+                "languageディレクティブの処理に失敗しました: {}",
+                src_path.display()
+            )
+        })?;
+
         // UI Control
-        let ui_blocks = parse_ui_blocks(&expansion.text);
-        let content = apply_ui_blocks(&expansion.text, &ui_blocks);
+        let ui_blocks = parse_ui_blocks(&content);
+        let content = apply_ui_blocks(&content, &ui_blocks);
 
         combined.push_str(&content);
         combined.push('\n');

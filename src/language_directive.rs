@@ -123,6 +123,34 @@ pub fn extract_language_directives(
     Ok(directives)
 }
 
+pub(crate) fn remove_language_directives(
+    source: &str,
+) -> Result<String, LanguageDirectiveExtractError> {
+    let directives = extract_language_directives(source)?;
+    if directives.is_empty() {
+        return Ok(source.to_string());
+    }
+
+    let mut spans = directives.iter().map(|directive| directive.span).peekable();
+    let mut output = String::with_capacity(source.len());
+
+    for (line_index, line) in source.split_inclusive('\n').enumerate() {
+        let line_number = line_index + 1;
+        while spans.peek().is_some_and(|span| span.end_line < line_number) {
+            spans.next();
+        }
+
+        let should_remove = spans
+            .peek()
+            .is_some_and(|span| span.start_line <= line_number && line_number <= span.end_line);
+        if !should_remove {
+            output.push_str(line);
+        }
+    }
+
+    Ok(output)
+}
+
 fn parse_tips_block(
     lines: &[&str],
     start_line_index: usize,
@@ -220,6 +248,69 @@ fn parse_nolang_targets(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn removes_all_language_directive_types_and_multiline_blocks() {
+        let source = concat!(
+            "---$script_tips:Script tips\n",
+            "---:continued\n",
+            "first\n",
+            "---$tips:UI tips\n",
+            "---   :continued\n",
+            "second\n",
+            "---$nolang: name, zero_label, options, option:選択肢, script_name\n",
+        );
+
+        assert_eq!(
+            remove_language_directives(source).unwrap(),
+            "first\nsecond\n"
+        );
+    }
+
+    #[test]
+    fn removes_directives_at_beginning_middle_and_end_with_or_without_final_lf() {
+        for (source, expected) in [
+            (
+                "---$nolang:name\nA\n---$tips:middle\nB\n---$script_tips:end\n",
+                "A\nB\n",
+            ),
+            (
+                "---$nolang:name\nA\n---$tips:middle\nB\n---$script_tips:end",
+                "A\nB\n",
+            ),
+        ] {
+            assert_eq!(remove_language_directives(source).unwrap(), expected);
+        }
+
+        assert_eq!(
+            remove_language_directives("---$tips:first\nretained").unwrap(),
+            "retained"
+        );
+    }
+
+    #[test]
+    fn preserves_blank_lines_non_targets_ui_directives_unknowns_and_labels() {
+        let source = concat!(
+            "ordinary\n",
+            "\n",
+            "-- ---$tips:comment\n",
+            " ---$tips:indented\n",
+            "---$foo:unknown\n",
+            "---$Tips:uppercase\n",
+            "---$nolang_extra:name\n",
+            "---$track:Track\n",
+            "@Label\n",
+        );
+
+        assert_eq!(remove_language_directives(source).unwrap(), source);
+    }
+
+    #[test]
+    fn propagates_existing_extractor_errors() {
+        for source in ["---$nolang\n", "---$tips:\n", "---$nolang:unknown\n"] {
+            assert!(remove_language_directives(source).is_err());
+        }
+    }
 
     #[test]
     fn extracts_single_line_tips_and_script_tips_in_order() {

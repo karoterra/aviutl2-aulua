@@ -4,6 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use rstest::rstest;
+use tempfile::TempDir;
 
 mod common;
 
@@ -55,6 +56,7 @@ fn assert_dirs_equal(out_dir: &Path, expected_dir: &Path) {
 #[case::basic("basic")]
 #[case::embed("embed")]
 #[case::pipeline("pipeline")]
+#[case::language_directives("language_directives")]
 fn test_build(#[case] case_name: &str) {
     let base_dir = common::get_fixture_path("build_tests").join(case_name);
     let config_path = base_dir.join("aulua.yaml");
@@ -68,4 +70,27 @@ fn test_build(#[case] case_name: &str) {
     build_all(&config, &out_dir).unwrap();
 
     assert_dirs_equal(&out_dir, &expected_dir);
+}
+
+#[test]
+fn malformed_language_directive_fails_before_writing_the_script() {
+    let temp = TempDir::new().unwrap();
+    let config_path = temp.path().join("aulua.yaml");
+    fs::write(
+        &config_path,
+        "scripts:\n  - name: malformed.obj2\n    sources:\n      - path: malformed.lua\n",
+    )
+    .unwrap();
+    fs::write(temp.path().join("malformed.lua"), "---$nolang\n").unwrap();
+    let config = load_config(&config_path).unwrap();
+    let out_dir = temp.path().join("build");
+
+    let error = build_all(&config, &out_dir).unwrap_err();
+
+    assert!(
+        error
+            .to_string()
+            .contains("languageディレクティブの処理に失敗しました")
+    );
+    assert!(!out_dir.join("malformed.obj2").exists());
 }

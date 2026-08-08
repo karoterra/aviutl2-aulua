@@ -1,3 +1,5 @@
+#[allow(dead_code)]
+pub(crate) mod aul2_document;
 pub mod build;
 pub mod config;
 pub mod config_loader;

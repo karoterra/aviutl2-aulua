@@ -82,8 +82,8 @@ pub(crate) enum BuildLanguageSectionCatalogError {
     },
 }
 
-pub(crate) fn build_language_section_catalog(
-    scripts: &[AnalyzedLogicalScript],
+pub(crate) fn build_language_section_catalog<'a>(
+    scripts: impl IntoIterator<Item = &'a AnalyzedLogicalScript>,
 ) -> Result<LanguageSectionCatalog, BuildLanguageSectionCatalogError> {
     let mut sections = Vec::new();
     let mut section_indices = HashMap::new();
@@ -193,6 +193,7 @@ mod tests {
         tips_entries: Vec<LanguageTipsEntry>,
     ) -> AnalyzedLogicalScript {
         AnalyzedLogicalScript {
+            configured_script_index: None,
             prepared: PreparedLogicalScript {
                 name: name.to_string(),
                 body: format!("body of {name}"),

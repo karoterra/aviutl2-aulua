@@ -4,7 +4,7 @@
 
 ## 基本的な流れ
 
-1. `aulua.yaml`の[`language.files`](../config.md#language)へ言語ファイルを追加する
+1. `aulua.yaml` のトップレベルまたはスクリプト別の [`language.files`](../config.md#language) へ言語ファイルを追加する
 2. 必要に応じてスクリプトへ[言語ディレクティブ](directives.md)を記述する
 3. [`aulua language update`](../commands/language.md#language-update)を実行する
 4. Default以外の言語ファイルを開き、空の値を翻訳する

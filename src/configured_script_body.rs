@@ -369,6 +369,7 @@ mod tests {
                 source(&first_path, Some("Ignored first"), HashMap::new()),
                 source(&second_path, Some("Ignored second"), HashMap::new()),
             ],
+            language: None,
         };
         let multiple = ResolvedScript {
             name: "@container.anm2".to_string(),
@@ -376,6 +377,7 @@ mod tests {
                 source(&preamble_path, None, HashMap::new()),
                 source(&part_path, Some("Part Label"), HashMap::new()),
             ],
+            language: None,
         };
         let normal = resolve_configured_script(&normal).unwrap().unwrap();
         let multiple = resolve_configured_script(&multiple).unwrap().unwrap();

@@ -81,15 +81,22 @@ pub(crate) fn build_language_file_plans(
 ) -> Vec<LanguageFilePlan> {
     requests
         .iter()
-        .map(|request| LanguageFilePlan {
-            request: request.clone(),
-            sections: catalog
-                .sections
-                .iter()
-                .filter_map(|candidate| build_section_plan(request, candidate))
-                .collect(),
-        })
+        .map(|request| build_language_file_plan(request, catalog))
         .collect()
+}
+
+pub(crate) fn build_language_file_plan(
+    request: &LanguageFileRequest,
+    catalog: &LanguageSectionCatalog,
+) -> LanguageFilePlan {
+    LanguageFilePlan {
+        request: request.clone(),
+        sections: catalog
+            .sections
+            .iter()
+            .filter_map(|candidate| build_section_plan(request, candidate))
+            .collect(),
+    }
 }
 
 fn build_section_plan(

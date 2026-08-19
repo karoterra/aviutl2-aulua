@@ -1,13 +1,16 @@
+use std::collections::{HashMap, HashSet};
+
 use thiserror::Error;
 
 use crate::config::ResolvedConfig;
-use crate::language_file_plan::{LanguageFilePlan, build_language_file_plans};
+use crate::language_file_plan::{LanguageFilePlan, build_language_file_plan};
 use crate::language_file_request::{
-    LanguageFileSelection, ResolveLanguageFileRequestsError, resolve_language_file_requests,
+    LanguageFileScope, LanguageFileSelection, ResolveLanguageFileRequestsError,
+    resolve_language_file_requests,
 };
 use crate::language_script_analysis::{
     AnalyzeLanguageScriptsError, AnalyzedLogicalScript, LanguageScriptInput,
-    analyze_language_scripts,
+    analyze_language_scripts_selected,
 };
 use crate::language_section_catalog::{
     BuildLanguageSectionCatalogError, build_language_section_catalog,
@@ -34,12 +37,78 @@ pub(crate) fn build_language_plan(
     script_input: LanguageScriptInput<'_>,
     file_selection: LanguageFileSelection<'_>,
 ) -> Result<LanguagePlan, BuildLanguagePlanError> {
-    let scripts = analyze_language_scripts(config, script_input)?;
-    let catalog = build_language_section_catalog(&scripts)?;
+    let use_configured_scopes = matches!(&script_input, LanguageScriptInput::Configured)
+        && matches!(file_selection, LanguageFileSelection::Configured);
+    let selected_script_indices =
+        configured_script_indices_for_analysis(config, &script_input, file_selection);
+    let scripts =
+        analyze_language_scripts_selected(config, script_input, selected_script_indices.as_ref())?;
     let requests = resolve_language_file_requests(config, file_selection)?;
-    let files = build_language_file_plans(&requests, &catalog);
+    let mut catalogs = HashMap::new();
+    let mut files = Vec::with_capacity(requests.len());
+
+    for request in requests {
+        let effective_scope = if use_configured_scopes {
+            request.scope()
+        } else {
+            LanguageFileScope::All
+        };
+
+        let catalog = match catalogs.entry(effective_scope) {
+            std::collections::hash_map::Entry::Occupied(entry) => entry.into_mut(),
+            std::collections::hash_map::Entry::Vacant(entry) => {
+                let catalog = build_language_section_catalog(
+                    scripts
+                        .iter()
+                        .filter(|script| script_belongs_to_scope(script, effective_scope)),
+                )?;
+                entry.insert(catalog)
+            }
+        };
+        files.push(build_language_file_plan(&request, catalog));
+    }
 
     Ok(LanguagePlan { scripts, files })
+}
+
+fn configured_script_indices_for_analysis(
+    config: &ResolvedConfig,
+    script_input: &LanguageScriptInput<'_>,
+    file_selection: LanguageFileSelection<'_>,
+) -> Option<HashSet<usize>> {
+    if !matches!(script_input, LanguageScriptInput::Configured)
+        || matches!(file_selection, LanguageFileSelection::Override(_))
+        || config
+            .language
+            .as_ref()
+            .is_some_and(|language| !language.files.is_empty())
+    {
+        return None;
+    }
+
+    Some(
+        config
+            .scripts
+            .iter()
+            .enumerate()
+            .filter_map(|(script_index, script)| {
+                script
+                    .language
+                    .as_ref()
+                    .is_some_and(|language| !language.files.is_empty())
+                    .then_some(script_index)
+            })
+            .collect(),
+    )
+}
+
+fn script_belongs_to_scope(script: &AnalyzedLogicalScript, scope: LanguageFileScope) -> bool {
+    match scope {
+        LanguageFileScope::All => true,
+        LanguageFileScope::ConfiguredScript { script_index } => {
+            script.configured_script_index == Some(script_index)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -108,7 +177,13 @@ mod tests {
                     variables: HashMap::new(),
                 })
                 .collect(),
+            language: None,
         }
+    }
+
+    fn with_language(mut script: ResolvedScript, language: ResolvedLanguage) -> ResolvedScript {
+        script.language = Some(language);
+        script
     }
 
     fn write(path: &Path, content: &str) {
@@ -208,6 +283,7 @@ mod tests {
         let broken_configured = ResolvedScript {
             name: "broken.anm2".to_string(),
             sources: Vec::new(),
+            language: None,
         };
         let config = config(
             temp.path(),
@@ -328,5 +404,207 @@ mod tests {
             ),
             Err(BuildLanguagePlanError::FileRequests(_))
         ));
+    }
+
+    #[test]
+    fn configured_plan_applies_global_and_nested_scopes_in_file_order() {
+        let temp = TempDir::new().unwrap();
+        let foo_source = temp.path().join("foo.lua");
+        let bar_source = temp.path().join("bar.lua");
+        write(&foo_source, "---$track:FooValue\nlocal value = 0\n");
+        write(&bar_source, "---$track:BarValue\nlocal value = 0\n");
+
+        let global_path = temp.path().join("Global.aul2");
+        let foo_path = temp.path().join("Foo.aul2");
+        let bar_path = temp.path().join("Bar.aul2");
+        let scripts = vec![
+            with_language(
+                script("foo.anm2", [foo_source]),
+                language([(foo_path.clone(), true, true)]),
+            ),
+            with_language(
+                script("bar.anm2", [bar_source]),
+                language([(bar_path.clone(), true, true)]),
+            ),
+        ];
+        let config = config(
+            temp.path(),
+            scripts,
+            Some(language([(global_path.clone(), true, true)])),
+        );
+
+        let plan = build_language_plan(
+            &config,
+            LanguageScriptInput::Configured,
+            LanguageFileSelection::Configured,
+        )
+        .unwrap();
+
+        assert_eq!(
+            plan.files
+                .iter()
+                .map(|file| file.request.path.clone())
+                .collect::<Vec<_>>(),
+            vec![global_path, foo_path, bar_path]
+        );
+        assert_eq!(section_names(&plan.files[0]), vec!["foo", "bar"]);
+        assert_eq!(section_names(&plan.files[1]), vec!["foo"]);
+        assert_eq!(section_names(&plan.files[2]), vec!["bar"]);
+        assert_eq!(plan.scripts[0].configured_script_index, Some(0));
+        assert_eq!(plan.scripts[1].configured_script_index, Some(1));
+    }
+
+    #[test]
+    fn nested_only_plan_analyzes_only_scripts_with_language_files() {
+        let temp = TempDir::new().unwrap();
+        let included_source = temp.path().join("included.lua");
+        write(&included_source, "---$track:Included\nlocal value = 0\n");
+        let nested_path = temp.path().join("Nested.aul2");
+        let scripts = vec![
+            with_language(
+                script("included.anm2", [included_source]),
+                language([(nested_path, true, true)]),
+            ),
+            script("not-analyzed.anm2", [temp.path().join("missing.lua")]),
+        ];
+        let config = config(temp.path(), scripts, None);
+
+        let plan = build_language_plan(
+            &config,
+            LanguageScriptInput::Configured,
+            LanguageFileSelection::Configured,
+        )
+        .unwrap();
+
+        assert_eq!(plan.scripts.len(), 1);
+        assert_eq!(plan.scripts[0].prepared.name, "included");
+        assert_eq!(section_names(&plan.files[0]), vec!["included"]);
+    }
+
+    #[test]
+    fn nested_only_plan_still_validates_global_logical_script_name_uniqueness() {
+        let temp = TempDir::new().unwrap();
+        let first_source = temp.path().join("first.lua");
+        let second_source = temp.path().join("second.lua");
+        write(&first_source, "");
+        write(&second_source, "");
+        let scripts = vec![
+            with_language(
+                script("duplicate.anm2", [first_source]),
+                language([(temp.path().join("Nested.aul2"), true, true)]),
+            ),
+            script("duplicate.anm2", [second_source]),
+        ];
+        let config = config(temp.path(), scripts, None);
+
+        assert!(matches!(
+            build_language_plan(
+                &config,
+                LanguageScriptInput::Configured,
+                LanguageFileSelection::Configured,
+            ),
+            Err(BuildLanguagePlanError::Scripts(_))
+        ));
+    }
+
+    #[test]
+    fn section_name_collisions_are_checked_per_effective_scope() {
+        let temp = TempDir::new().unwrap();
+        let foo_source = temp.path().join("foo.lua");
+        let tips_foo_source = temp.path().join("tips_foo.lua");
+        write(&foo_source, "---$script_tips:Foo tips\n");
+        write(&tips_foo_source, "");
+        let scripts = vec![
+            with_language(
+                script("foo.anm2", [foo_source]),
+                language([(temp.path().join("Foo.aul2"), true, true)]),
+            ),
+            with_language(
+                script("Tips.foo.anm2", [tips_foo_source]),
+                language([(temp.path().join("TipsFoo.aul2"), true, true)]),
+            ),
+        ];
+
+        let nested_only = config(temp.path(), scripts, None);
+        assert!(
+            build_language_plan(
+                &nested_only,
+                LanguageScriptInput::Configured,
+                LanguageFileSelection::Configured,
+            )
+            .is_ok()
+        );
+
+        let mut with_global = nested_only;
+        with_global.language = Some(language([(temp.path().join("Global.aul2"), true, true)]));
+        assert!(matches!(
+            build_language_plan(
+                &with_global,
+                LanguageScriptInput::Configured,
+                LanguageFileSelection::Configured,
+            ),
+            Err(BuildLanguagePlanError::Sections(_))
+        ));
+    }
+
+    #[test]
+    fn direct_selection_applies_one_catalog_to_global_and_nested_files() {
+        let temp = TempDir::new().unwrap();
+        let direct_path = temp.path().join("direct.anm2");
+        write(&direct_path, "--check@enabled:Direct,false\n");
+        let global_path = temp.path().join("Global.aul2");
+        let nested_path = temp.path().join("Nested.aul2");
+        let scripts = vec![with_language(
+            script("configured.anm2", [temp.path().join("missing.lua")]),
+            language([(nested_path, true, true)]),
+        )];
+        let config = config(
+            temp.path(),
+            scripts,
+            Some(language([(global_path, true, true)])),
+        );
+        let direct_paths = vec![direct_path];
+
+        let plan = build_language_plan(
+            &config,
+            LanguageScriptInput::Direct(&direct_paths),
+            LanguageFileSelection::Configured,
+        )
+        .unwrap();
+
+        assert_eq!(plan.files.len(), 2);
+        assert!(
+            plan.files
+                .iter()
+                .all(|file| section_names(file) == vec!["direct"])
+        );
+    }
+
+    #[test]
+    fn override_ignores_configured_files_and_analyzes_all_configured_scripts() {
+        let temp = TempDir::new().unwrap();
+        let foo_source = temp.path().join("foo.lua");
+        let bar_source = temp.path().join("bar.lua");
+        write(&foo_source, "");
+        write(&bar_source, "");
+        let invalid_language = language([
+            (temp.path().join("Invalid.txt"), true, true),
+            (temp.path().join("Invalid.txt"), true, true),
+        ]);
+        let scripts = vec![
+            with_language(script("foo.anm2", [foo_source]), invalid_language),
+            script("bar.anm2", [bar_source]),
+        ];
+        let config = config(temp.path(), scripts, None);
+
+        let plan = build_language_plan(
+            &config,
+            LanguageScriptInput::Configured,
+            LanguageFileSelection::Override(Path::new("Override.aul2")),
+        )
+        .unwrap();
+
+        assert_eq!(plan.files.len(), 1);
+        assert_eq!(section_names(&plan.files[0]), vec!["foo", "bar"]);
     }
 }

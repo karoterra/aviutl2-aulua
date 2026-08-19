@@ -14,7 +14,7 @@ aulua pack
 
 ## 言語ファイル
 
-`aulua.yaml`の[`language.files`](../config.md#language)に設定した言語ファイルは、すべてパッケージへ格納されます。
+`aulua.yaml` のトップレベルとスクリプト別の [`language.files`](../config.md#language) に設定した言語ファイルは、すべてパッケージへ格納されます。
 
 元ファイルのディレクトリ部分は引き継がず、ファイル名を使って次のパスへ配置します。
 

@@ -236,3 +236,55 @@ fn pack_project_rejects_language_file_with_invalid_extension() {
     assert!(error.contains("拡張子が.aul2ではありません"));
     assert!(error.contains("English.txt"));
 }
+
+#[test]
+fn pack_project_includes_global_and_script_specific_language_files() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    fs::create_dir_all(root.join("translations")).unwrap();
+    fs::write(root.join("script.lua"), "").unwrap();
+    fs::write(
+        root.join("translations/Global.aul2"),
+        "[global]\nkey=global\n",
+    )
+    .unwrap();
+    fs::write(
+        root.join("translations/Scoped.aul2"),
+        "[scoped]\nkey=scoped\n",
+    )
+    .unwrap();
+    fs::write(
+        root.join("aulua.yaml"),
+        r#"package:
+  id: karoterra.scoped-language-test
+  name: Scoped Language Test
+  information: Scoped language package test
+  out_dir: dist
+  assets: []
+language:
+  files:
+    - path: translations/Global.aul2
+scripts:
+  - name: script.anm2
+    sources:
+      - path: script.lua
+    language:
+      files:
+        - path: translations/Scoped.aul2
+"#,
+    )
+    .unwrap();
+
+    let config = load_config(root.join("aulua.yaml")).unwrap();
+    let archive_path = pack_project(&config).unwrap();
+    let mut zip = ZipArchive::new(fs::File::open(archive_path).unwrap()).unwrap();
+
+    assert_eq!(
+        read_zip_entry(&mut zip, "Language/Global.aul2"),
+        b"[global]\nkey=global\n"
+    );
+    assert_eq!(
+        read_zip_entry(&mut zip, "Language/Scoped.aul2"),
+        b"[scoped]\nkey=scoped\n"
+    );
+}

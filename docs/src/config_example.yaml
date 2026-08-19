@@ -32,10 +32,7 @@ package:
 
 language:
   files:
-    - path: Language/Default.ColorVisionSimulation.aul2
-      text: false
-      tooltip: true
-    - path: Language/English.ColorVisionSimulation.aul2
+    - path: Language/English.AllScripts.aul2
 
 scripts:
   - name: 色覚シミュレーションKR.anm2
@@ -43,6 +40,12 @@ scripts:
       - path: script/色覚シミュレーションKR.in.anm2
         variables:
           INFO: 色覚シミュレーションKR for AviUtl2
+    language:
+      files:
+        - path: Language/Default.ColorVisionSimulation.aul2
+          text: false
+          tooltip: true
+        - path: Language/English.ColorVisionSimulation.aul2
 
   - name: "@MyEffect.anm2"
     sources:
@@ -54,3 +57,6 @@ scripts:
         label: EffectB
         variables:
           INFO: MyEffect (EffectB)
+    language:
+      files:
+        - path: Language/English.MyEffect.aul2

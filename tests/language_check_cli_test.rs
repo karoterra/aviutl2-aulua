@@ -35,7 +35,7 @@ fn direct_script_and_target_override_can_be_clean_without_output() {
     write_project_file(
         temp.path(),
         "aulua.yaml",
-        "scripts:\n  - name: broken.anm2\n    sources:\n      - path: missing.lua\nlanguage:\n  files:\n    - path: missing-configured.aul2\n",
+        "scripts:\n  - name: broken.anm2\n    sources:\n      - path: missing.lua\n    language:\n      files:\n        - path: invalid.txt\n        - path: invalid.txt\nlanguage:\n  files:\n    - path: missing-configured.aul2\n",
     );
     write_project_file(
         temp.path(),
@@ -137,4 +137,89 @@ fn malformed_language_file_is_an_execution_error_not_a_finding() {
             .unwrap()
             .contains("language fileのcheckに失敗しました")
     );
+}
+
+#[test]
+fn configured_check_uses_each_script_specific_scope() {
+    let temp = TempDir::new().unwrap();
+    write_project_file(
+        temp.path(),
+        "aulua.yaml",
+        r#"scripts:
+  - name: foo.anm2
+    sources:
+      - path: foo.lua
+    language:
+      files:
+        - path: Foo.aul2
+  - name: bar.anm2
+    sources:
+      - path: bar.lua
+    language:
+      files:
+        - path: Bar.aul2
+"#,
+    );
+    write_project_file(
+        temp.path(),
+        "foo.lua",
+        "---$track:FooValue\nlocal value = 0\n",
+    );
+    write_project_file(
+        temp.path(),
+        "bar.lua",
+        "---$track:BarValue\nlocal value = 0\n",
+    );
+    write_project_file(
+        temp.path(),
+        "Foo.aul2",
+        "[foo]\nfoo=Translated\nFooValue=Translated\n\n[bar]\nUnmanaged=\n",
+    );
+    write_project_file(
+        temp.path(),
+        "Bar.aul2",
+        "[bar]\nbar=Translated\nBarValue=Translated\n",
+    );
+
+    let output = run_aulua(temp.path(), &["language", "check"]);
+
+    assert!(output.status.success(), "{output:?}");
+    assert!(output.stdout.is_empty());
+    assert!(output.stderr.is_empty());
+}
+
+#[test]
+fn nested_only_check_skips_unscoped_script_content_analysis() {
+    let temp = TempDir::new().unwrap();
+    write_project_file(
+        temp.path(),
+        "aulua.yaml",
+        r#"scripts:
+  - name: included.anm2
+    sources:
+      - path: included.lua
+    language:
+      files:
+        - path: Included.aul2
+  - name: skipped.anm2
+    sources:
+      - path: missing.lua
+"#,
+    );
+    write_project_file(
+        temp.path(),
+        "included.lua",
+        "---$track:Value\nlocal value = 0\n",
+    );
+    write_project_file(
+        temp.path(),
+        "Included.aul2",
+        "[included]\nincluded=Translated\nValue=Translated\n",
+    );
+
+    let output = run_aulua(temp.path(), &["language", "check"]);
+
+    assert!(output.status.success(), "{output:?}");
+    assert!(output.stdout.is_empty());
+    assert!(output.stderr.is_empty());
 }

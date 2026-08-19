@@ -14,8 +14,20 @@ pub(crate) enum LanguageFileSelection<'a> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum LanguageFileRequestOrigin {
-    Configured { index: usize },
+    Configured {
+        index: usize,
+    },
+    ConfiguredScript {
+        script_index: usize,
+        file_index: usize,
+    },
     Override,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum LanguageFileScope {
+    All,
+    ConfiguredScript { script_index: usize },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -25,6 +37,19 @@ pub(crate) struct LanguageFileRequest {
     pub tooltip: bool,
     pub is_default: bool,
     pub origin: LanguageFileRequestOrigin,
+}
+
+impl LanguageFileRequest {
+    pub(crate) fn scope(&self) -> LanguageFileScope {
+        match self.origin {
+            LanguageFileRequestOrigin::ConfiguredScript { script_index, .. } => {
+                LanguageFileScope::ConfiguredScript { script_index }
+            }
+            LanguageFileRequestOrigin::Configured { .. } | LanguageFileRequestOrigin::Override => {
+                LanguageFileScope::All
+            }
+        }
+    }
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -119,34 +144,63 @@ pub(crate) fn resolve_language_file_requests(
 fn resolve_configured_requests(
     config: &ResolvedConfig,
 ) -> Result<Vec<LanguageFileRequest>, ResolveLanguageFileRequestsError> {
-    let language = config
-        .language
-        .as_ref()
-        .ok_or(ResolveLanguageFileRequestsError::MissingLanguageConfig)?;
-    if language.files.is_empty() {
+    let has_language_config = config.language.is_some()
+        || config
+            .scripts
+            .iter()
+            .any(|script| script.language.is_some());
+    if !has_language_config {
+        return Err(ResolveLanguageFileRequestsError::MissingLanguageConfig);
+    }
+
+    let mut requests = Vec::new();
+
+    if let Some(language) = &config.language {
+        for (index, file) in language.files.iter().enumerate() {
+            requests.push(build_configured_request(
+                file,
+                LanguageFileRequestOrigin::Configured { index },
+            )?);
+        }
+    }
+
+    for (script_index, script) in config.scripts.iter().enumerate() {
+        let Some(language) = &script.language else {
+            continue;
+        };
+
+        for (file_index, file) in language.files.iter().enumerate() {
+            requests.push(build_configured_request(
+                file,
+                LanguageFileRequestOrigin::ConfiguredScript {
+                    script_index,
+                    file_index,
+                },
+            )?);
+        }
+    }
+
+    if requests.is_empty() {
         return Err(ResolveLanguageFileRequestsError::EmptyLanguageFiles);
     }
 
-    let requests = language
-        .files
-        .iter()
-        .enumerate()
-        .map(|(index, file)| {
-            let origin = LanguageFileRequestOrigin::Configured { index };
-            let is_default = validate_request_language_file_path(&file.path, origin)?;
-
-            Ok(LanguageFileRequest {
-                path: file.path.clone(),
-                text: file.text,
-                tooltip: file.tooltip,
-                is_default,
-                origin,
-            })
-        })
-        .collect::<Result<Vec<_>, ResolveLanguageFileRequestsError>>()?;
-
     validate_unique_paths(&requests)?;
     Ok(requests)
+}
+
+fn build_configured_request(
+    file: &crate::config::ResolvedLanguageFile,
+    origin: LanguageFileRequestOrigin,
+) -> Result<LanguageFileRequest, ResolveLanguageFileRequestsError> {
+    let is_default = validate_request_language_file_path(&file.path, origin)?;
+
+    Ok(LanguageFileRequest {
+        path: file.path.clone(),
+        text: file.text,
+        tooltip: file.tooltip,
+        is_default,
+        origin,
+    })
 }
 
 fn resolve_override_path(config_dir: &Path, path: &Path) -> PathBuf {
@@ -204,6 +258,7 @@ mod tests {
     use super::*;
     use crate::config::{
         ResolvedBuild, ResolvedInstall, ResolvedLanguage, ResolvedLanguageFile, ResolvedProject,
+        ResolvedScript,
     };
 
     fn config(
@@ -238,6 +293,14 @@ mod tests {
 
     fn language(files: Vec<ResolvedLanguageFile>) -> Option<ResolvedLanguage> {
         Some(ResolvedLanguage { files })
+    }
+
+    fn script_language(files: Vec<ResolvedLanguageFile>) -> ResolvedScript {
+        ResolvedScript {
+            name: "unused.anm2".to_string(),
+            sources: Vec::new(),
+            language: language(files),
+        }
     }
 
     fn configured_origin(index: usize) -> LanguageFileRequestOrigin {
@@ -495,6 +558,139 @@ mod tests {
                 duplicate_origin: configured_origin(2),
             }
         );
+    }
+
+    #[test]
+    fn configured_requests_include_global_then_nested_files_in_definition_order() {
+        let mut config = config(
+            "ignored",
+            language(vec![language_file("Global.aul2", true, true)]),
+        );
+        config.scripts = vec![
+            script_language(vec![
+                language_file("First.Default.aul2", false, true),
+                language_file("First.English.aul2", true, false),
+            ]),
+            script_language(vec![language_file("Second.aul2", true, true)]),
+        ];
+
+        let requests =
+            resolve_language_file_requests(&config, LanguageFileSelection::Configured).unwrap();
+
+        assert_eq!(
+            requests
+                .iter()
+                .map(|request| request.origin)
+                .collect::<Vec<_>>(),
+            vec![
+                LanguageFileRequestOrigin::Configured { index: 0 },
+                LanguageFileRequestOrigin::ConfiguredScript {
+                    script_index: 0,
+                    file_index: 0,
+                },
+                LanguageFileRequestOrigin::ConfiguredScript {
+                    script_index: 0,
+                    file_index: 1,
+                },
+                LanguageFileRequestOrigin::ConfiguredScript {
+                    script_index: 1,
+                    file_index: 0,
+                },
+            ]
+        );
+        assert_eq!(requests[0].scope(), LanguageFileScope::All);
+        assert_eq!(
+            requests[1].scope(),
+            LanguageFileScope::ConfiguredScript { script_index: 0 }
+        );
+        assert_eq!(
+            requests[3].scope(),
+            LanguageFileScope::ConfiguredScript { script_index: 1 }
+        );
+    }
+
+    #[test]
+    fn configured_selection_distinguishes_missing_config_from_empty_all_scopes() {
+        let missing = config("ignored", None);
+        assert_eq!(
+            resolve_language_file_requests(&missing, LanguageFileSelection::Configured)
+                .unwrap_err(),
+            ResolveLanguageFileRequestsError::MissingLanguageConfig
+        );
+
+        let mut nested_empty = config("ignored", None);
+        nested_empty.scripts = vec![script_language(Vec::new())];
+        assert_eq!(
+            resolve_language_file_requests(&nested_empty, LanguageFileSelection::Configured)
+                .unwrap_err(),
+            ResolveLanguageFileRequestsError::EmptyLanguageFiles
+        );
+    }
+
+    #[test]
+    fn duplicate_paths_are_rejected_across_global_and_nested_scopes() {
+        let duplicate = PathBuf::from("Language/English.aul2");
+        let mut config = config(
+            "ignored",
+            language(vec![language_file(&duplicate, true, true)]),
+        );
+        config.scripts = vec![script_language(vec![language_file(&duplicate, true, true)])];
+
+        assert_eq!(
+            resolve_language_file_requests(&config, LanguageFileSelection::Configured).unwrap_err(),
+            ResolveLanguageFileRequestsError::DuplicatePath {
+                path: duplicate,
+                first_origin: LanguageFileRequestOrigin::Configured { index: 0 },
+                duplicate_origin: LanguageFileRequestOrigin::ConfiguredScript {
+                    script_index: 0,
+                    file_index: 0,
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn duplicate_paths_are_rejected_across_script_specific_settings() {
+        let duplicate = PathBuf::from("Language/English.aul2");
+        let mut config = config("ignored", None);
+        config.scripts = vec![
+            script_language(vec![language_file(&duplicate, true, true)]),
+            script_language(vec![language_file(&duplicate, true, true)]),
+        ];
+
+        assert_eq!(
+            resolve_language_file_requests(&config, LanguageFileSelection::Configured).unwrap_err(),
+            ResolveLanguageFileRequestsError::DuplicatePath {
+                path: duplicate,
+                first_origin: LanguageFileRequestOrigin::ConfiguredScript {
+                    script_index: 0,
+                    file_index: 0,
+                },
+                duplicate_origin: LanguageFileRequestOrigin::ConfiguredScript {
+                    script_index: 1,
+                    file_index: 0,
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn override_ignores_invalid_and_duplicate_nested_configuration() {
+        let mut config = config("project", None);
+        config.scripts = vec![script_language(vec![
+            language_file("Invalid.txt", true, true),
+            language_file("Invalid.txt", true, true),
+        ])];
+
+        let requests = resolve_language_file_requests(
+            &config,
+            LanguageFileSelection::Override(Path::new("Override.aul2")),
+        )
+        .unwrap();
+
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0].path, PathBuf::from("project/Override.aul2"));
+        assert_eq!(requests[0].origin, LanguageFileRequestOrigin::Override);
     }
 
     #[cfg(unix)]

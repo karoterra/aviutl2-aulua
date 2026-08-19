@@ -1,10 +1,11 @@
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 use thiserror::Error;
 
 use crate::config::ResolvedConfig;
 use crate::configured_script::{
-    ConfiguredLogicalScript, ConfiguredScriptError, resolve_configured_scripts,
+    ConfiguredLogicalScript, ConfiguredScriptError, resolve_indexed_configured_scripts,
 };
 use crate::configured_script_body::{
     PrepareConfiguredLogicalScriptError, PreparedConfiguredLogicalScript,
@@ -17,6 +18,7 @@ use crate::logical_script_language::{
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct AnalyzedConfiguredLogicalScript {
+    pub configured_script_index: Option<usize>,
     pub prepared: PreparedConfiguredLogicalScript,
     pub language: LogicalScriptLanguage,
 }
@@ -58,18 +60,44 @@ pub(crate) fn analyze_configured_logical_script(
         source: Box::new(source),
     })?;
 
-    Ok(AnalyzedConfiguredLogicalScript { prepared, language })
+    Ok(AnalyzedConfiguredLogicalScript {
+        configured_script_index: None,
+        prepared,
+        language,
+    })
 }
 
+#[cfg(test)]
 pub(crate) fn analyze_configured_scripts(
     config: &ResolvedConfig,
 ) -> Result<Vec<AnalyzedConfiguredLogicalScript>, AnalyzeConfiguredScriptsError> {
-    let configured_files = resolve_configured_scripts(&config.scripts)?;
+    analyze_configured_scripts_selected(config, None)
+}
+
+pub(crate) fn analyze_configured_scripts_selected(
+    config: &ResolvedConfig,
+    selected_script_indices: Option<&HashSet<usize>>,
+) -> Result<Vec<AnalyzedConfiguredLogicalScript>, AnalyzeConfiguredScriptsError> {
+    // Resolve every configured script first so that structural validation and the
+    // global logical-script-name uniqueness constraint remain independent of the
+    // language-file scopes selected for content analysis.
+    let configured_files = resolve_indexed_configured_scripts(&config.scripts)?;
     let mut analyzed = Vec::new();
 
     for configured_file in configured_files {
-        for logical_script in &configured_file.logical_scripts {
-            analyzed.push(analyze_configured_logical_script(config, logical_script)?);
+        if selected_script_indices
+            .is_some_and(|indices| !indices.contains(&configured_file.script_index))
+        {
+            continue;
+        }
+
+        for logical_script in &configured_file.file.logical_scripts {
+            let analyzed_script = analyze_configured_logical_script(config, logical_script)?;
+            analyzed.push(AnalyzedConfiguredLogicalScript {
+                configured_script_index: Some(configured_file.script_index),
+                prepared: analyzed_script.prepared,
+                language: analyzed_script.language,
+            });
         }
     }
 
@@ -128,6 +156,7 @@ mod tests {
         ResolvedScript {
             name: name.to_string(),
             sources,
+            language: None,
         }
     }
 

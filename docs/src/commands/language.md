@@ -15,7 +15,7 @@ aulua language update [OPTIONS]
 
 ### `--script <path>`
 
-`--script` を指定しない場合は、`aulua.yaml` の `scripts` に設定されたスクリプトを解析します。
+`--script` を指定しない場合は、`aulua.yaml` の `scripts` に設定されたスクリプトを解析します。トップレベルの `language.files` が1件以上ある場合は、すべてのスクリプトが対象です。トップレベルに言語ファイルがない場合は、スクリプト別の `language.files` が1件以上あるスクリプトだけを解析します。どちらの場合も、`scripts` の設定自体はすべて検証します。
 
 指定した場合は、設定されたスクリプトの代わりに、指定したビルド済みAviUtl2スクリプトを直接解析します。複数指定でき、指定順に処理されます。
 
@@ -24,19 +24,19 @@ aulua language update --script build/Effect.anm2
 aulua language update --script build/Effect.anm2 --script build/Object.obj2
 ```
 
-`--script` は言語ファイルの選択とは独立しており、`--output` と組み合わせることもできます。
+`--script` は言語ファイルの選択とは独立しており、`--output` と組み合わせることもできます。`--output` を指定しない場合は、トップレベルとスクリプト別を含むすべての設定済み言語ファイルを更新します。各言語ファイルには、`--script` で指定したスクリプトの解析結果が使用されます。
 
 ### `--output <path>`
 
-`--output` を指定しない場合は、`aulua.yaml` の [`language.files`](../config.md#language) に設定されたすべてのファイルを更新します。
+`--output` を指定しない場合は、`aulua.yaml` のトップレベルとスクリプト別の [`language.files`](../config.md#language) に設定されたすべてのファイルを更新します。`--script` を指定していない場合、トップレベルのファイルにはすべてのスクリプト、スクリプト別のファイルには対応する設定から生成される論理スクリプトの解析結果が使用されます。
 
-指定した場合は、設定された`language.files`を使用せず、指定した1つの言語ファイルだけを更新します。相対パスは`aulua.yaml`があるディレクトリを基準に解決され、TextとTooltipの両方が管理対象になります。
+指定した場合は、設定済みの言語ファイルを使用せず、指定した1つの言語ファイルだけを更新します。相対パスは `aulua.yaml` があるディレクトリを基準に解決され、Text と Tooltip の両方が管理対象になります。
 
 ```bash
 aulua language update --output Language/English.example.aul2
 ```
 
-`--output`を指定する場合も`aulua.yaml`は必要です。
+`--output` を指定する場合も `aulua.yaml` は必要です。
 
 ### 更新内容
 
@@ -74,9 +74,9 @@ aulua language check [OPTIONS]
 
 ### `--target <path>`
 
-`--target` を指定しない場合は、設定された`language.files`を検査します。
+`--target` を指定しない場合は、トップレベルとスクリプト別に設定されたすべての言語ファイルを、それぞれの対象範囲で検査します。`--script` を指定した場合は、各言語ファイルに指定したスクリプトの解析結果を使用します。
 
-指定した場合は、設定された`language.files`を使用せず、指定した1つの言語ファイルをText・Tooltip両方の対象として検査します。相対パスの基準と`aulua.yaml`が必要な点は`language update --output`と同じです。
+指定した場合は、設定済みの言語ファイルを使用せず、指定した1つの言語ファイルを Text・Tooltip 両方の対象として検査します。相対パスの基準と `aulua.yaml` が必要な点は `language update --output` と同じです。
 
 ```bash
 aulua language check --target Language/English.example.aul2

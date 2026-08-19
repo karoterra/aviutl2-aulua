@@ -88,10 +88,13 @@ pub fn pack_project(config: &ResolvedConfig) -> Result<PathBuf> {
         )?;
     }
 
-    // language.files
-    if let Some(language) = &config.language {
-        add_language_files(&mut zip, &mut seen_paths, &language.files, options)?;
-    }
+    // language.files / scripts[].language.files
+    add_language_files(
+        &mut zip,
+        &mut seen_paths,
+        config.configured_language_files(),
+        options,
+    )?;
 
     // package.assets
     for asset in &pack.assets {
@@ -122,10 +125,10 @@ pub fn pack_project(config: &ResolvedConfig) -> Result<PathBuf> {
     Ok(out_path)
 }
 
-fn add_language_files<W: Write + Seek>(
+fn add_language_files<'a, W: Write + Seek>(
     zip: &mut ZipWriter<W>,
     seen_paths: &mut HashSet<String>,
-    files: &[ResolvedLanguageFile],
+    files: impl IntoIterator<Item = &'a ResolvedLanguageFile>,
     options: SimpleFileOptions,
 ) -> Result<()> {
     for file in files {

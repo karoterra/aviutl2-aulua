@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 use thiserror::Error;
@@ -5,7 +6,8 @@ use thiserror::Error;
 use crate::config::ResolvedConfig;
 use crate::configured_script_body::{ConfiguredSourceWarning, PreparedConfiguredLogicalScript};
 use crate::configured_script_language::{
-    AnalyzeConfiguredScriptsError, AnalyzedConfiguredLogicalScript, analyze_configured_scripts,
+    AnalyzeConfiguredScriptsError, AnalyzedConfiguredLogicalScript,
+    analyze_configured_scripts_selected,
 };
 use crate::direct_script_language::{
     AnalyzeDirectScriptsError, AnalyzedDirectLogicalScript, PreparedDirectLogicalScript,
@@ -43,6 +45,7 @@ pub(crate) struct PreparedLogicalScript {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct AnalyzedLogicalScript {
+    pub configured_script_index: Option<usize>,
     pub prepared: PreparedLogicalScript,
     pub language: LogicalScriptLanguage,
 }
@@ -98,9 +101,14 @@ impl From<PreparedDirectLogicalScript> for PreparedLogicalScript {
 
 impl From<AnalyzedConfiguredLogicalScript> for AnalyzedLogicalScript {
     fn from(analyzed: AnalyzedConfiguredLogicalScript) -> Self {
-        let AnalyzedConfiguredLogicalScript { prepared, language } = analyzed;
+        let AnalyzedConfiguredLogicalScript {
+            configured_script_index,
+            prepared,
+            language,
+        } = analyzed;
 
         Self {
+            configured_script_index,
             prepared: prepared.into(),
             language,
         }
@@ -112,6 +120,7 @@ impl From<AnalyzedDirectLogicalScript> for AnalyzedLogicalScript {
         let AnalyzedDirectLogicalScript { prepared, language } = analyzed;
 
         Self {
+            configured_script_index: None,
             prepared: prepared.into(),
             language,
         }
@@ -132,11 +141,22 @@ pub(crate) fn analyze_language_scripts(
     config: &ResolvedConfig,
     input: LanguageScriptInput<'_>,
 ) -> Result<Vec<AnalyzedLogicalScript>, AnalyzeLanguageScriptsError> {
+    analyze_language_scripts_selected(config, input, None)
+}
+
+pub(crate) fn analyze_language_scripts_selected(
+    config: &ResolvedConfig,
+    input: LanguageScriptInput<'_>,
+    selected_configured_script_indices: Option<&HashSet<usize>>,
+) -> Result<Vec<AnalyzedLogicalScript>, AnalyzeLanguageScriptsError> {
     match input {
-        LanguageScriptInput::Configured => Ok(analyze_configured_scripts(config)?
-            .into_iter()
-            .map(Into::into)
-            .collect()),
+        LanguageScriptInput::Configured => Ok(analyze_configured_scripts_selected(
+            config,
+            selected_configured_script_indices,
+        )?
+        .into_iter()
+        .map(Into::into)
+        .collect()),
         LanguageScriptInput::Direct(paths) => {
             if paths.is_empty() {
                 return Err(AnalyzeLanguageScriptsError::EmptyDirectScripts);
@@ -201,6 +221,7 @@ mod tests {
         ResolvedScript {
             name: name.to_string(),
             sources,
+            language: None,
         }
     }
 

@@ -91,3 +91,74 @@ language:
         Ok(_) => panic!("エラーが発生すべき入力で成功してしまった"),
     }
 }
+
+#[test]
+fn test_load_script_language_config_without_global_language() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = dir.path().join("aulua.yaml");
+    fs::write(
+        &config_path,
+        r#"
+scripts:
+  - name: effect.anm2
+    sources:
+      - path: effect.lua
+    language:
+      files:
+        - path: language/Default.effect.aul2
+          text: false
+          tooltip: true
+        - path: language/English.effect.aul2
+"#,
+    )
+    .unwrap();
+
+    let config = load_config(&config_path).expect("設定ファイルの読み込みに失敗");
+    assert!(config.language.is_none());
+    let language = config.scripts[0]
+        .language
+        .as_ref()
+        .expect("scripts[].language が解決されていない");
+
+    assert_eq!(language.files.len(), 2);
+    assert_eq!(
+        language.files[0].path,
+        dir.path().join("language/Default.effect.aul2")
+    );
+    assert!(!language.files[0].text);
+    assert!(language.files[0].tooltip);
+    assert!(language.files[1].text);
+    assert!(language.files[1].tooltip);
+}
+
+#[test]
+fn test_script_language_file_text_and_tooltip_both_false_should_fail() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = dir.path().join("aulua.yaml");
+    fs::write(
+        &config_path,
+        r#"
+scripts:
+  - name: effect.anm2
+    sources:
+      - path: effect.lua
+    language:
+      files:
+        - path: language/Disabled.effect.aul2
+          text: false
+          tooltip: false
+"#,
+    )
+    .unwrap();
+
+    let result = load_config(&config_path);
+
+    match result {
+        Err(ConfigError::Resolve(error)) => assert_eq!(
+            error.to_string(),
+            "scripts[0].language.files[0] の text と tooltip を両方 false にすることはできません。"
+        ),
+        Err(error) => panic!("予期しないエラー種別: {error}"),
+        Ok(_) => panic!("エラーが発生すべき入力で成功してしまった"),
+    }
+}

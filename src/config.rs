@@ -83,47 +83,40 @@ impl RawConfig {
 
         let language = self
             .language
-            .map(|language| {
-                let files = language
-                    .files
-                    .into_iter()
-                    .enumerate()
-                    .map(|(index, file)| {
-                        let text = file.text.unwrap_or(true);
-                        let tooltip = file.tooltip.unwrap_or(true);
-
-                        if !text && !tooltip {
-                            return Err(ConfigResolveError::LanguageFileDisabled { index });
-                        }
-
-                        Ok(ResolvedLanguageFile {
-                            path: config_dir.join(file.path),
-                            text,
-                            tooltip,
-                        })
-                    })
-                    .collect::<Result<Vec<_>, _>>()?;
-
-                Ok(ResolvedLanguage { files })
-            })
+            .map(|language| resolve_language(language, &config_dir, LanguageConfigScope::Global))
             .transpose()?;
 
         let scripts = self
             .scripts
             .into_iter()
-            .map(|s| ResolvedScript {
-                name: s.name,
-                sources: s
-                    .sources
-                    .into_iter()
-                    .map(|src| ResolvedScriptSource {
-                        path: config_dir.join(src.path),
-                        label: src.label,
-                        variables: src.variables.unwrap_or_default(),
+            .enumerate()
+            .map(|(script_index, s)| {
+                let language = s
+                    .language
+                    .map(|language| {
+                        resolve_language(
+                            language,
+                            &config_dir,
+                            LanguageConfigScope::Script { script_index },
+                        )
                     })
-                    .collect(),
+                    .transpose()?;
+
+                Ok(ResolvedScript {
+                    name: s.name,
+                    sources: s
+                        .sources
+                        .into_iter()
+                        .map(|src| ResolvedScriptSource {
+                            path: config_dir.join(src.path),
+                            label: src.label,
+                            variables: src.variables.unwrap_or_default(),
+                        })
+                        .collect(),
+                    language,
+                })
             })
-            .collect();
+            .collect::<Result<Vec<_>, ConfigResolveError>>()?;
 
         Ok(ResolvedConfig {
             project,
@@ -137,10 +130,61 @@ impl RawConfig {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+enum LanguageConfigScope {
+    Global,
+    Script { script_index: usize },
+}
+
+fn resolve_language(
+    language: RawLanguage,
+    config_dir: &Path,
+    scope: LanguageConfigScope,
+) -> Result<ResolvedLanguage, ConfigResolveError> {
+    let files = language
+        .files
+        .into_iter()
+        .enumerate()
+        .map(|(file_index, file)| {
+            let text = file.text.unwrap_or(true);
+            let tooltip = file.tooltip.unwrap_or(true);
+
+            if !text && !tooltip {
+                return Err(match scope {
+                    LanguageConfigScope::Global => {
+                        ConfigResolveError::LanguageFileDisabled { index: file_index }
+                    }
+                    LanguageConfigScope::Script { script_index } => {
+                        ConfigResolveError::ScriptLanguageFileDisabled {
+                            script_index,
+                            file_index,
+                        }
+                    }
+                });
+            }
+
+            Ok(ResolvedLanguageFile {
+                path: config_dir.join(file.path),
+                text,
+                tooltip,
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(ResolvedLanguage { files })
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigResolveError {
     #[error("language.files[{index}] の text と tooltip を両方 false にすることはできません。")]
     LanguageFileDisabled { index: usize },
+    #[error(
+        "scripts[{script_index}].language.files[{file_index}] の text と tooltip を両方 false にすることはできません。"
+    )]
+    ScriptLanguageFileDisabled {
+        script_index: usize,
+        file_index: usize,
+    },
 }
 
 /// `project` セクション
@@ -211,6 +255,8 @@ pub struct RawPackageAsset {
 pub struct RawScript {
     pub name: String,
     pub sources: Vec<RawScriptSource>,
+    /// このスクリプトから生成される論理スクリプトを対象にする言語ファイル設定
+    pub language: Option<RawLanguage>,
 }
 
 /// 各スクリプトソースの設定
@@ -388,6 +434,18 @@ impl ResolvedConfig {
     pub fn install_out_dir(&self) -> PathBuf {
         self.install.out_dir.clone()
     }
+
+    pub fn configured_language_files(&self) -> impl Iterator<Item = &ResolvedLanguageFile> {
+        self.language
+            .iter()
+            .flat_map(|language| language.files.iter())
+            .chain(
+                self.scripts
+                    .iter()
+                    .flat_map(|script| script.language.iter())
+                    .flat_map(|language| language.files.iter()),
+            )
+    }
 }
 
 #[derive(Debug)]
@@ -448,6 +506,7 @@ pub struct ResolvedPackageAsset {
 pub struct ResolvedScript {
     pub name: String,
     pub sources: Vec<ResolvedScriptSource>,
+    pub language: Option<ResolvedLanguage>,
 }
 
 #[derive(Debug)]

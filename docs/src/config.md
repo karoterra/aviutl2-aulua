@@ -38,10 +38,10 @@ package:
 
 language:
   files:
-    - path: Language/Default.ColorVisionSimulation.aul2
+    - path: Language/Default.AllScripts.aul2
       text: false
       tooltip: true
-    - path: Language/English.ColorVisionSimulation.aul2
+    - path: Language/English.AllScripts.aul2
 
 scripts:
   - name: 色覚シミュレーションKR.anm2
@@ -49,6 +49,12 @@ scripts:
       - path: script/色覚シミュレーションKR.in.anm2
         variables:
           INFO: 色覚シミュレーションKR for AviUtl2
+    language:
+      files:
+        - path: Language/Default.ColorVisionSimulation.aul2
+          text: false
+          tooltip: true
+        - path: Language/English.ColorVisionSimulation.aul2
 
   - name: "@MyEffect.anm2"
     sources:
@@ -60,6 +66,9 @@ scripts:
         label: EffectB
         variables:
           INFO: MyEffect (EffectB)
+    language:
+      files:
+        - path: Language/English.MyEffect.aul2
 ```
 
 ## project
@@ -182,31 +191,52 @@ package:
 
 ## language
 
-言語ファイルの生成・更新・検査に関する設定を指定します。
+言語ファイルの生成・更新・検査に関する設定を指定します。すべてのスクリプトを対象にする場合はトップレベルの `language`、個別のスクリプトだけを対象にする場合はスクリプト別の `language` に設定します。
 
 ```yaml
 language:
   files:
-    - path: Language/Default.example.aul2
+    - path: Language/Default.AllScripts.aul2
       text: false
       tooltip: true
-    - path: Language/English.example.aul2
+    - path: Language/English.AllScripts.aul2
+
+scripts:
+  - name: Foo.anm2
+    sources:
+      - path: src/Foo.lua
+    language:
+      files:
+        - path: Language/Default.Foo.aul2
+          text: false
+          tooltip: true
+        - path: Language/English.Foo.aul2
+
+  - name: Bar.obj2
+    sources:
+      - path: src/Bar.lua
 ```
 
+トップレベルの `language.files` には、`aulua.yaml` の `scripts` に設定されたすべてのスクリプトから生成される論理スクリプトのセクションが含まれます。トップレベルの `language` は不要なら省略できます。
+
+スクリプト別の `language.files` には、そのスクリプト設定から生成される論理スクリプトのセクションだけが含まれます。`@` から始まる複数スクリプト形式の場合は、その設定から生成されるすべての論理スクリプトが対象です。
+
 `files`
-  : 管理する言語ファイルを配列で指定します。設定されたファイルを使用して`language update`または`language check`を実行する場合は、1件以上必要です。
+  : 管理する言語ファイルを配列で指定します。`language update` または `language check` で設定済みの言語ファイルを使用する場合は、トップレベルとスクリプト別を合わせて1件以上のファイルが必要です。
 
 `files[].path`
-  : 言語ファイルのパスを指定します。相対パスは`aulua.yaml`があるディレクトリを基準に解決されます。
-    ファイルの拡張子は大文字小文字を区別し、小文字の`.aul2`である必要があります。ファイル名はUTF-8文字列として扱える必要があります。
+  : 言語ファイルのパスを指定します。相対パスは `aulua.yaml` があるディレクトリを基準に解決されます。
+    ファイルの拡張子は大文字小文字を区別し、小文字の `.aul2` である必要があります。ファイル名は UTF-8 文字列として扱える必要があります。
 
 `files[].text`
-  : `true`の場合、通常翻訳セクションを更新・検査・削除の対象にします。デフォルト値は`true`です。
+  : `true` の場合、通常翻訳セクションを更新・検査・削除の対象にします。デフォルト値は `true` です。
 
 `files[].tooltip`
-  : `true`の場合、Tipsセクションを更新・検査・削除の対象にします。デフォルト値は`true`です。
+  : `true` の場合、Tips セクションを更新・検査・削除の対象にします。デフォルト値は `true` です。
 
-`text`と`tooltip`の両方を`false`にすることはできず、設定エラーになります。完全に同じ設定パスのファイルを複数回指定した場合は`aulua language`コマンドでエラーになります。
+`text` と `tooltip` の両方を `false` にすることはできず、設定エラーになります。トップレベルとスクリプト別を含め、完全に同じ設定パスのファイルを複数回指定した場合は `aulua language` コマンドでエラーになります。
+
+設定された言語ファイルは、トップレベルの `language.files`、`scripts` の定義順、各スクリプト別の `language.files` の定義順で処理されます。`pack` では、トップレベルとスクリプト別のどちらに設定した言語ファイルもパッケージに含まれます。
 
 言語ファイルの形式や作業手順については[言語ファイル](language/)、コマンドについては[`aulua language`](commands/language.md)を参照してください。
 
@@ -222,6 +252,9 @@ scripts:
       - path: script/色覚シミュレーションKR.in.anm2
         variables:
           INFO: 色覚シミュレーションKR for AviUtl2
+    language:
+      files:
+        - path: Language/English.ColorVisionSimulation.aul2
 
   - name: "@MyEffect.anm2"
     sources:
@@ -233,6 +266,9 @@ scripts:
         label: EffectB
         variables:
           INFO: MyEffect (EffectB)
+    language:
+      files:
+        - path: Language/English.MyEffect.aul2
 ```
 
 `[].name`
@@ -253,6 +289,9 @@ scripts:
     上記サンプルでは `INFO` という変数を定義していますが、変数の個数・名前は自由に指定可能です。
     ただし変数名に使える文字は英字（`A-Za-z`）、数字（`0-9`）、アンダーバー（`_`）です。
     `project.variables` に同じ名前の変数が存在する場合は、スクリプトソースの変数の値が使用されます。
+
+`[].language`
+  : この設定から生成される論理スクリプトだけを対象にする言語ファイルを指定します。各項目の形式はトップレベルの [`language`](#language) と同じです。
 
 ## スキーマ
 

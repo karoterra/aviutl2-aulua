@@ -64,6 +64,7 @@ mod tests {
             scripts: vec![crate::config::ResolvedScript {
                 name: script_name.to_string(),
                 sources: vec![],
+                language: None,
             }],
             config_dir: Path::new(".").to_path_buf(),
         };

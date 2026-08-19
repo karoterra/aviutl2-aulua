@@ -50,7 +50,7 @@ fn direct_scripts_and_output_override_ignore_configured_inputs_and_files() {
     write_project_file(
         temp.path(),
         "aulua.yaml",
-        "scripts:\n  - name: broken.anm2\n    sources:\n      - path: missing.lua\nlanguage:\n  files:\n    - path: Language/configured.aul2\n",
+        "scripts:\n  - name: broken.anm2\n    sources:\n      - path: missing.lua\n    language:\n      files:\n        - path: invalid.txt\n        - path: invalid.txt\nlanguage:\n  files:\n    - path: Language/configured.aul2\n",
     );
     write_project_file(
         temp.path(),
@@ -119,5 +119,148 @@ fn config_errors_make_the_command_fail() {
         String::from_utf8(output.stderr)
             .unwrap()
             .contains("language fileの更新に失敗しました")
+    );
+}
+
+#[test]
+fn configured_update_creates_global_and_script_specific_files() {
+    let temp = TempDir::new().unwrap();
+    write_project_file(
+        temp.path(),
+        "aulua.yaml",
+        r#"language:
+  files:
+    - path: Language/Global.aul2
+scripts:
+  - name: foo.anm2
+    sources:
+      - path: foo.lua
+    language:
+      files:
+        - path: Language/Foo.aul2
+  - name: "@group.anm2"
+    sources:
+      - path: preamble.lua
+      - path: first.lua
+        label: First
+      - path: second.lua
+        label: Second
+    language:
+      files:
+        - path: Language/Group.aul2
+"#,
+    );
+    write_project_file(
+        temp.path(),
+        "foo.lua",
+        "---$track:FooValue\nlocal value = 0\n",
+    );
+    write_project_file(
+        temp.path(),
+        "preamble.lua",
+        "---$track:PreambleValue\nlocal value = 0\n",
+    );
+    write_project_file(
+        temp.path(),
+        "first.lua",
+        "---$track:FirstValue\nlocal value = 0\n",
+    );
+    write_project_file(
+        temp.path(),
+        "second.lua",
+        "---$track:SecondValue\nlocal value = 0\n",
+    );
+
+    let output = run_aulua(temp.path(), &["language", "update"]);
+
+    assert!(output.status.success(), "{output:?}");
+    let global = fs::read_to_string(temp.path().join("Language/Global.aul2")).unwrap();
+    let foo = fs::read_to_string(temp.path().join("Language/Foo.aul2")).unwrap();
+    let group = fs::read_to_string(temp.path().join("Language/Group.aul2")).unwrap();
+    assert!(global.contains("[foo]"));
+    assert!(global.contains("[First@group]"));
+    assert!(global.contains("[Second@group]"));
+    assert!(!global.contains("PreambleValue"));
+    assert!(foo.contains("[foo]"));
+    assert!(!foo.contains("[First@group]"));
+    assert!(!foo.contains("[Second@group]"));
+    assert!(group.contains("[First@group]"));
+    assert!(group.contains("[Second@group]"));
+    assert!(!group.contains("[foo]"));
+}
+
+#[test]
+fn direct_script_without_output_updates_all_global_and_nested_files() {
+    let temp = TempDir::new().unwrap();
+    write_project_file(
+        temp.path(),
+        "aulua.yaml",
+        r#"language:
+  files:
+    - path: Global.aul2
+scripts:
+  - name: configured.anm2
+    sources:
+      - path: missing.lua
+    language:
+      files:
+        - path: Nested.aul2
+"#,
+    );
+    write_project_file(
+        temp.path(),
+        "direct.anm2",
+        "--check@enabled:Enabled,false\n",
+    );
+
+    let output = run_aulua(
+        temp.path(),
+        &["language", "update", "--script", "direct.anm2"],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    for path in ["Global.aul2", "Nested.aul2"] {
+        let language = fs::read_to_string(temp.path().join(path)).unwrap();
+        assert!(language.contains("[direct]"), "{path}: {language}");
+        assert!(language.contains("Enabled="), "{path}: {language}");
+    }
+}
+
+#[test]
+fn scoped_prune_does_not_manage_sections_from_other_scripts() {
+    let temp = TempDir::new().unwrap();
+    write_project_file(
+        temp.path(),
+        "aulua.yaml",
+        r#"scripts:
+  - name: foo.anm2
+    sources:
+      - path: foo.lua
+    language:
+      files:
+        - path: Foo.aul2
+  - name: bar.anm2
+    sources:
+      - path: bar.lua
+"#,
+    );
+    write_project_file(
+        temp.path(),
+        "foo.lua",
+        "---$track:Current\nlocal value = 0\n",
+    );
+    write_project_file(temp.path(), "bar.lua", "---$track:Bar\nlocal value = 0\n");
+    write_project_file(
+        temp.path(),
+        "Foo.aul2",
+        "[foo]\nfoo=Translated\nCurrent=Translated\nOld=Remove\n\n[bar]\nbar=Keep\nOld=Keep\n",
+    );
+
+    let output = run_aulua(temp.path(), &["language", "update", "--prune"]);
+
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        fs::read_to_string(temp.path().join("Foo.aul2")).unwrap(),
+        "[foo]\nfoo=Translated\nCurrent=Translated\n\n[bar]\nbar=Keep\nOld=Keep\n"
     );
 }

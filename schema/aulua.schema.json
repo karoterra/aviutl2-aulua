@@ -267,6 +267,17 @@
       "description": "各出力スクリプト単位の設定",
       "type": "object",
       "properties": {
+        "language": {
+          "description": "このスクリプトから生成される論理スクリプトを対象にする言語ファイル設定",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RawLanguage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "name": {
           "type": "string"
         },

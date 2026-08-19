@@ -22,6 +22,12 @@ pub struct ConfiguredLogicalScript<'a> {
     pub sources: &'a [ResolvedScriptSource],
 }
 
+#[derive(Debug)]
+pub(crate) struct IndexedConfiguredScriptFile<'a> {
+    pub script_index: usize,
+    pub file: ConfiguredScriptFile<'a>,
+}
+
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum ConfiguredScriptError {
     #[error(transparent)]
@@ -75,10 +81,19 @@ pub fn resolve_configured_script(
 pub fn resolve_configured_scripts(
     scripts: &[ResolvedScript],
 ) -> Result<Vec<ConfiguredScriptFile<'_>>, ConfiguredScriptError> {
+    Ok(resolve_indexed_configured_scripts(scripts)?
+        .into_iter()
+        .map(|configured| configured.file)
+        .collect())
+}
+
+pub(crate) fn resolve_indexed_configured_scripts(
+    scripts: &[ResolvedScript],
+) -> Result<Vec<IndexedConfiguredScriptFile<'_>>, ConfiguredScriptError> {
     let mut result = Vec::new();
     let mut logical_script_names = HashSet::new();
 
-    for script in scripts {
+    for (script_index, script) in scripts.iter().enumerate() {
         let Some(configured_script) = resolve_configured_script(script)? else {
             continue;
         };
@@ -91,7 +106,10 @@ pub fn resolve_configured_scripts(
             }
         }
 
-        result.push(configured_script);
+        result.push(IndexedConfiguredScriptFile {
+            script_index,
+            file: configured_script,
+        });
     }
 
     Ok(result)
@@ -198,6 +216,7 @@ mod tests {
         ResolvedScript {
             name: name.to_string(),
             sources,
+            language: None,
         }
     }
 

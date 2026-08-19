@@ -1,0 +1,275 @@
+[tools]
+"github:EmbarkStudios/cargo-about" = "latest"
+"github:russellbanks/Komac" = "latest"
+"cargo:cargo-edit" = "latest"
+
+[settings]
+lockfile = true
+
+[tasks.release]
+description = "Prepare a release commit and annotated tag without pushing"
+shell = "bash"
+usage = '''
+arg "<version>" help="Release version in X.Y.Z format (without leading v)"
+'''
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+VERSION="{{ usage.version }}"
+TAG="v${VERSION}"
+TEMP_DIR=""
+ROLLBACK_VERSION_FILES=false
+
+fail() {
+    echo "Error: $*" >&2
+    exit 1
+}
+
+cleanup() {
+    local status=$?
+
+    if [[ -n "$TEMP_DIR" && -d "$TEMP_DIR" ]]; then
+        rm -rf -- "$TEMP_DIR"
+    fi
+
+    if [[ $status -ne 0 && "$ROLLBACK_VERSION_FILES" == true ]]; then
+        echo "Restoring Cargo.toml and Cargo.lock..." >&2
+        git restore --source=HEAD --staged --worktree -- Cargo.toml Cargo.lock
+    fi
+
+    exit "$status"
+}
+trap cleanup EXIT
+
+assert_version_files_only() {
+    local changed_files
+    changed_files="$({
+        git diff --name-only
+        git diff --cached --name-only
+        git ls-files --others --exclude-standard
+    } | LC_ALL=C sort -u)"
+
+    if [[ "$changed_files" != $'Cargo.lock\nCargo.toml' ]]; then
+        echo "Unexpected changed files:" >&2
+        if [[ -n "$changed_files" ]]; then
+            printf '%s\n' "$changed_files" >&2
+        else
+            echo "(none)" >&2
+        fi
+        fail "cargo set-version must change only Cargo.toml and Cargo.lock."
+    fi
+}
+
+if [[ "$VERSION" == v* ]]; then
+    fail "Pass the version without a leading 'v'."
+fi
+
+if [[ ! "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+    fail "Version must use X.Y.Z format."
+fi
+
+if [[ -n "$(git status --porcelain=v1 --untracked-files=all)" ]]; then
+    fail "Working tree is not clean."
+fi
+
+if git show-ref --verify --quiet "refs/tags/$TAG"; then
+    fail "Local tag $TAG already exists."
+fi
+
+if ! remote_tag_refs="$(git ls-remote --tags origin "refs/tags/$TAG" "refs/tags/$TAG^{}")"; then
+    fail "Failed to check tags on origin."
+fi
+if [[ -n "$remote_tag_refs" ]]; then
+    fail "Tag $TAG already exists on origin."
+fi
+
+git switch main
+git fetch origin main
+git merge --ff-only origin/main
+
+if [[ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]]; then
+    fail "HEAD does not exactly match origin/main after synchronization."
+fi
+
+echo "Preparing release $TAG"
+ROLLBACK_VERSION_FILES=true
+cargo set-version "$VERSION"
+assert_version_files_only
+
+TEMP_DIR="$(mktemp -d)"
+
+cargo fmt --all --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo build --release
+cargo test --workspace
+
+cargo run --release -- schema -o "$TEMP_DIR/aulua.schema.json"
+git diff --no-index --exit-code -- \
+    schema/aulua.schema.json \
+    "$TEMP_DIR/aulua.schema.json"
+
+cargo about generate about.hbs -o "$TEMP_DIR/NOTICE.html"
+if [[ ! -s "$TEMP_DIR/NOTICE.html" ]]; then
+    fail "NOTICE.html was not generated or is empty."
+fi
+
+git diff --check
+assert_version_files_only
+
+git add Cargo.toml Cargo.lock
+git commit -m ":bookmark: $TAG"
+ROLLBACK_VERSION_FILES=false
+git tag -a "$TAG" -m "version $VERSION"
+
+echo ""
+echo "Release commit and annotated tag $TAG were created locally."
+echo "No changes were pushed. Review them, then push manually:"
+echo "  git push origin main"
+echo "  git push origin $TAG"
+'''
+
+[tasks."release:crates"]
+description = "Publish a released version to crates.io"
+shell = "bash"
+usage = '''
+arg "<version>" help="Release version in X.Y.Z format (without leading v)"
+'''
+confirm = { message = "Publish aulua {{ usage.version }} to crates.io? Published versions cannot be removed or overwritten.", default = "no" }
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+VERSION="{{ usage.version }}"
+TAG="v${VERSION}"
+
+fail() {
+    echo "Error: $*" >&2
+    exit 1
+}
+
+if [[ "$VERSION" == v* ]]; then
+    fail "Pass the version without a leading 'v'."
+fi
+
+if [[ ! "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+    fail "Version must use X.Y.Z format."
+fi
+
+if [[ -n "$(git status --porcelain=v1 --untracked-files=all)" ]]; then
+    fail "Working tree is not clean."
+fi
+
+if [[ "$(git branch --show-current)" != "main" ]]; then
+    fail "Current branch must be main."
+fi
+
+if ! git rev-parse --verify --quiet origin/main >/dev/null; then
+    fail "origin/main is not available. Fetch it before publishing."
+fi
+
+if [[ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]]; then
+    fail "HEAD does not exactly match origin/main."
+fi
+
+PACKAGE_VERSION="$(cargo pkgid | sed 's/.*@//')"
+if [[ "$PACKAGE_VERSION" != "$VERSION" ]]; then
+    fail "Cargo.toml package version is $PACKAGE_VERSION, expected $VERSION."
+fi
+
+if ! git show-ref --verify --quiet "refs/tags/$TAG"; then
+    fail "Tag $TAG does not exist locally."
+fi
+
+if [[ "$(git cat-file -t "$TAG")" != "tag" ]]; then
+    fail "Tag $TAG is not an annotated tag."
+fi
+
+if [[ "$(git rev-parse "$TAG^{}")" != "$(git rev-parse HEAD)" ]]; then
+    fail "Tag $TAG does not point to HEAD."
+fi
+
+TAG_ANNOTATION="$(git for-each-ref --format='%(contents:subject)' "refs/tags/$TAG")"
+if [[ "$TAG_ANNOTATION" != "version $VERSION" ]]; then
+    fail "Tag $TAG annotation is '$TAG_ANNOTATION', expected 'version $VERSION'."
+fi
+
+CRATES_IO_URL="https://crates.io/api/v1/crates/aulua/$VERSION"
+if ! CRATES_IO_STATUS="$(curl --silent --show-error --output /dev/null \
+    --write-out '%{http_code}' \
+    --user-agent 'aulua-release-task' \
+    "$CRATES_IO_URL")"; then
+    fail "Failed to check whether aulua $VERSION is already published on crates.io."
+fi
+
+case "$CRATES_IO_STATUS" in
+    200)
+        fail "aulua $VERSION is already published on crates.io."
+        ;;
+    404)
+        ;;
+    *)
+        fail "crates.io returned unexpected HTTP status $CRATES_IO_STATUS."
+        ;;
+esac
+
+cargo publish --dry-run
+cargo publish
+'''
+
+[tasks."release:winget"]
+description = "Create a winget-pkgs update for a released version"
+shell = "bash"
+usage = '''
+arg "<version>" help="Release version in X.Y.Z format (without leading v)"
+'''
+confirm = { message = "Run Komac for aulua {{ usage.version }}? This may update your fork and create a winget-pkgs pull request.", default = "no" }
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+VERSION="{{ usage.version }}"
+TAG="v${VERSION}"
+URL="https://github.com/karoterra/aviutl2-aulua/releases/download/$TAG/aulua-$TAG-windows-x64.zip"
+
+fail() {
+    echo "Error: $*" >&2
+    exit 1
+}
+
+if [[ "$VERSION" == v* ]]; then
+    fail "Pass the version without a leading 'v'."
+fi
+
+if [[ ! "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+    fail "Version must use X.Y.Z format."
+fi
+
+if [[ -n "$(git status --porcelain=v1 --untracked-files=all)" ]]; then
+    fail "Working tree is not clean."
+fi
+
+if [[ "$(git branch --show-current)" != "main" ]]; then
+    fail "Current branch must be main."
+fi
+
+PACKAGE_VERSION="$(cargo pkgid | sed 's/.*@//')"
+if [[ "$PACKAGE_VERSION" != "$VERSION" ]]; then
+    fail "Cargo.toml package version is $PACKAGE_VERSION, expected $VERSION."
+fi
+
+if ! git show-ref --verify --quiet "refs/tags/$TAG"; then
+    fail "Tag $TAG does not exist locally."
+fi
+
+if [[ "$(git rev-parse "$TAG^{}")" != "$(git rev-parse HEAD)" ]]; then
+    fail "Tag $TAG does not point to HEAD."
+fi
+
+if ! curl --fail --silent --show-error --location --head "$URL" >/dev/null; then
+    fail "GitHub Release asset is not available: $URL"
+fi
+
+komac sync
+komac update Karoterra.Aulua --version "$VERSION" --urls "$URL"
+'''

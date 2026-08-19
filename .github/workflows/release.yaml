@@ -39,8 +39,10 @@ jobs:
       - name: Build
         run: cargo build --release
 
-      - name: Install cargo-about
-        run: cargo install --locked cargo-about --features cli
+      - name: Setup cargo-about
+        uses: jdx/mise-action@v4
+        with:
+          install_args: github:EmbarkStudios/cargo-about
 
       - name: Generate NOTICE.html
         run: cargo about generate about.hbs -o NOTICE.html

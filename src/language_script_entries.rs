@@ -134,7 +134,7 @@ fn validate_value_ui_names(info: &LanguageScriptInfo) -> Result<(), LanguageScri
     let mut names: HashMap<&str, (LanguageUiKind, SourceSpan)> = HashMap::new();
 
     for ui in &info.ui_items {
-        if !is_value_ui_kind(ui.kind) {
+        if !is_standard_value_ui_kind(ui.kind) {
             continue;
         }
         let original = ui.name.name.original.as_str();
@@ -212,7 +212,7 @@ fn validate_group_state_keys(info: &LanguageScriptInfo) -> Result<(), LanguageSc
         if let Some(value_ui) = info
             .ui_items
             .iter()
-            .find(|ui| is_value_ui_kind(ui.kind) && ui.name.name.original == state_key)
+            .find(|ui| is_standard_value_ui_kind(ui.kind) && ui.name.name.original == state_key)
         {
             return Err(LanguageScriptEntriesError::GroupStateKeyConflict {
                 state_key,
@@ -255,6 +255,9 @@ fn validate_select_option_names(
 
 fn validate_effect_name_tips(info: &LanguageScriptInfo) -> Result<(), LanguageScriptEntriesError> {
     for ui in &info.ui_items {
+        if ui.kind == LanguageUiKind::Param {
+            continue;
+        }
         if ui.name.name.original != "effect.name" {
             continue;
         }
@@ -397,8 +400,11 @@ fn language_ui_tips_entry(
     }
 }
 
-fn is_value_ui_kind(kind: LanguageUiKind) -> bool {
-    !matches!(kind, LanguageUiKind::Group | LanguageUiKind::Separator)
+fn is_standard_value_ui_kind(kind: LanguageUiKind) -> bool {
+    !matches!(
+        kind,
+        LanguageUiKind::Param | LanguageUiKind::Group | LanguageUiKind::Separator
+    )
 }
 
 #[cfg(test)]
@@ -483,6 +489,41 @@ mod tests {
                 }
             );
         }
+    }
+
+    #[test]
+    fn allows_duplicate_params_and_names_shared_with_standard_ui() {
+        let model = info(vec![
+            ui(LanguageUiKind::Param, "周期", "周期", 1),
+            ui(LanguageUiKind::Param, "周期", "周期", 2),
+            ui(LanguageUiKind::Param, "周期", "周期", 3),
+            ui(LanguageUiKind::Track, "周期", "周期", 4),
+        ]);
+
+        let result = build(&model).unwrap();
+
+        let entry = result
+            .text_entries
+            .iter()
+            .find(|entry| entry.key == "周期")
+            .unwrap();
+        assert_eq!(entry.origins.len(), 4);
+        assert!(
+            entry
+                .origins
+                .iter()
+                .all(|origin| matches!(origin, LanguageTextOrigin::UiName { .. }))
+        );
+    }
+
+    #[test]
+    fn param_does_not_conflict_with_group_state_key() {
+        let model = info(vec![
+            ui(LanguageUiKind::Group, "Settings", "Settings", 1),
+            ui(LanguageUiKind::Param, "Settings.hide", "Settings.hide", 2),
+        ]);
+
+        assert!(build(&model).is_ok());
     }
 
     #[test]

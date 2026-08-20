@@ -19,6 +19,8 @@ aulua language update [OPTIONS]
 
 指定した場合は、設定されたスクリプトの代わりに、指定したビルド済みAviUtl2スクリプトを直接解析します。複数指定でき、指定順に処理されます。
 
+UIの解析方法はファイルの拡張子で決まります。`.tra2`では対応する`--param:項目名,初期値`だけを解析し、通常の`--track@`などは対象外です。
+
 ```bash
 aulua language update --script build/Effect.anm2
 aulua language update --script build/Effect.anm2 --script build/Object.obj2

@@ -251,8 +251,10 @@ fn apply_pending_to_ui(
     tips: Option<TipsText>,
     nolang: Vec<PendingNolangTarget>,
 ) -> Result<LanguageUiInfo, LanguageScriptInfoError> {
-    if matches!(ui.kind, LanguageUiKind::Group | LanguageUiKind::Separator)
-        && let Some(tips) = &tips
+    if matches!(
+        ui.kind,
+        LanguageUiKind::Param | LanguageUiKind::Group | LanguageUiKind::Separator
+    ) && let Some(tips) = &tips
     {
         return Err(LanguageScriptInfoError::TipsNotSupported {
             kind: ui.kind,
@@ -875,8 +877,12 @@ mod tests {
     }
 
     #[test]
-    fn group_and_separator_reject_tips() {
-        for kind in [LanguageUiKind::Group, LanguageUiKind::Separator] {
+    fn unsupported_ui_kinds_reject_tips() {
+        for kind in [
+            LanguageUiKind::Param,
+            LanguageUiKind::Group,
+            LanguageUiKind::Separator,
+        ] {
             assert!(matches!(
                 build(
                     vec![ui(kind, 2, 2, LanguageUiMeta::None)],

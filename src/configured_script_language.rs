@@ -13,7 +13,8 @@ use crate::configured_script_body::{
 };
 use crate::language_ui::LanguageScriptSyntax;
 use crate::logical_script_language::{
-    LogicalScriptLanguage, LogicalScriptLanguageError, analyze_logical_script_language,
+    LanguageScriptFormat, LogicalScriptLanguage, LogicalScriptLanguageError,
+    analyze_logical_script_language_with_format,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -44,21 +45,31 @@ pub(crate) enum AnalyzeConfiguredScriptsError {
     LogicalScript(#[from] AnalyzeConfiguredLogicalScriptError),
 }
 
+#[cfg(test)]
 pub(crate) fn analyze_configured_logical_script(
     config: &ResolvedConfig,
     logical_script: &ConfiguredLogicalScript<'_>,
 ) -> Result<AnalyzedConfiguredLogicalScript, AnalyzeConfiguredLogicalScriptError> {
-    let prepared = prepare_configured_logical_script(config, logical_script)?;
-    let language = analyze_logical_script_language(
-        &prepared.name,
-        &prepared.body,
-        LanguageScriptSyntax::AuluaSource,
+    analyze_configured_logical_script_with_format(
+        config,
+        logical_script,
+        LanguageScriptFormat::Standard(LanguageScriptSyntax::AuluaSource),
     )
-    .map_err(|source| AnalyzeConfiguredLogicalScriptError::Language {
-        script_name: prepared.name.clone(),
-        source_paths: prepared.source_paths.clone(),
-        source: Box::new(source),
-    })?;
+}
+
+fn analyze_configured_logical_script_with_format(
+    config: &ResolvedConfig,
+    logical_script: &ConfiguredLogicalScript<'_>,
+    format: LanguageScriptFormat,
+) -> Result<AnalyzedConfiguredLogicalScript, AnalyzeConfiguredLogicalScriptError> {
+    let prepared = prepare_configured_logical_script(config, logical_script)?;
+    let language =
+        analyze_logical_script_language_with_format(&prepared.name, &prepared.body, format)
+            .map_err(|source| AnalyzeConfiguredLogicalScriptError::Language {
+                script_name: prepared.name.clone(),
+                source_paths: prepared.source_paths.clone(),
+                source: Box::new(source),
+            })?;
 
     Ok(AnalyzedConfiguredLogicalScript {
         configured_script_index: None,
@@ -91,8 +102,20 @@ pub(crate) fn analyze_configured_scripts_selected(
             continue;
         }
 
+        let format = if configured_file
+            .file
+            .identity
+            .extension
+            .eq_ignore_ascii_case("tra2")
+        {
+            LanguageScriptFormat::Tra2
+        } else {
+            LanguageScriptFormat::Standard(LanguageScriptSyntax::AuluaSource)
+        };
+
         for logical_script in &configured_file.file.logical_scripts {
-            let analyzed_script = analyze_configured_logical_script(config, logical_script)?;
+            let analyzed_script =
+                analyze_configured_logical_script_with_format(config, logical_script, format)?;
             analyzed.push(AnalyzedConfiguredLogicalScript {
                 configured_script_index: Some(configured_file.script_index),
                 prepared: analyzed_script.prepared,
@@ -383,6 +406,73 @@ mod tests {
         );
         assert!(result[1].prepared.body.contains("local first = true"));
         assert!(!result[1].prepared.body.contains("@First"));
+    }
+
+    #[test]
+    fn configured_tra2_extracts_only_params_from_each_logical_script() {
+        let temp = TempDir::new().unwrap();
+        let preamble_path = temp.path().join("preamble.lua");
+        let first_path = temp.path().join("first.lua");
+        let second_path = temp.path().join("second.lua");
+        write(&preamble_path, "--param:Preamble,1\n");
+        write(
+            &first_path,
+            concat!(
+                "--track@vx:X速度,-10,10,0\n",
+                "---$track:Y速度\n",
+                "local y = 0\n",
+                "--param:aaa::周期,0.5\n",
+                "--param:周期,0.5\n",
+                "--param:周期,1.0\n",
+            ),
+        );
+        write(&second_path, "--param:デューティ比%,50\n");
+        let config = config(vec![script(
+            "@container.tra2",
+            vec![
+                source(&preamble_path, None),
+                source(&first_path, Some("First")),
+                source(&second_path, Some("Second")),
+            ],
+        )]);
+
+        let result = analyze_configured_scripts(&config).unwrap();
+
+        assert_eq!(
+            result
+                .iter()
+                .map(|script| script.prepared.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["First@container", "Second@container"]
+        );
+        assert_eq!(
+            result[0]
+                .language
+                .entries
+                .text_entries
+                .iter()
+                .map(|entry| (entry.key.as_str(), entry.origins.len()))
+                .collect::<Vec<_>>(),
+            vec![("First@container", 1), ("aaa::周期", 1), ("周期", 2),]
+        );
+        assert_eq!(
+            result[1]
+                .language
+                .entries
+                .text_entries
+                .iter()
+                .map(|entry| entry.key.as_str())
+                .collect::<Vec<_>>(),
+            vec!["Second@container", "デューティ比%"]
+        );
+        assert!(result.iter().all(|script| {
+            !script
+                .language
+                .entries
+                .text_entries
+                .iter()
+                .any(|entry| matches!(entry.key.as_str(), "Preamble" | "X速度" | "Y速度"))
+        }));
     }
 
     #[test]

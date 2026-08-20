@@ -264,3 +264,56 @@ fn scoped_prune_does_not_manage_sections_from_other_scripts() {
         "[foo]\nfoo=Translated\nCurrent=Translated\n\n[bar]\nbar=Keep\nOld=Keep\n"
     );
 }
+
+#[test]
+fn direct_tra2_update_outputs_only_plain_param_names() {
+    let temp = TempDir::new().unwrap();
+    write_project_file(
+        temp.path(),
+        "aulua.yaml",
+        "scripts:\n  - name: broken.anm2\n    sources:\n      - path: missing.lua\n",
+    );
+    write_project_file(
+        temp.path(),
+        "@Basic_S.tra2",
+        concat!(
+            "@コマ落ち反復\n",
+            "--track@vx:X速度,-10,10,0\n",
+            "--param:周期の単位/select/秒=0/フレーム=1/Hz=2,0\n",
+            "--param:aaa::周期,0.5\n",
+            "--param:周期,0.5\n",
+            "--param:周期,1.0\n",
+            "--param:周期(分母),1\n",
+            "--param:周期ずれ%,0\n",
+            "--param:空初期値,\n",
+            "--param:有効/check,0\n",
+            "--param:デューティ比%,50\n",
+        ),
+    );
+
+    let output = run_aulua(
+        temp.path(),
+        &[
+            "language",
+            "update",
+            "--script",
+            "@Basic_S.tra2",
+            "--output",
+            "English.aul2",
+        ],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        fs::read_to_string(temp.path().join("English.aul2")).unwrap(),
+        concat!(
+            "[コマ落ち反復@Basic_S]\n",
+            "コマ落ち反復@Basic_S=\n",
+            "aaa::周期=\n",
+            "周期=\n",
+            "周期(分母)=\n",
+            "周期ずれ%=\n",
+            "デューティ比%=\n",
+        )
+    );
+}

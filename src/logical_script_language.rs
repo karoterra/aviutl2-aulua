@@ -1,13 +1,25 @@
 use thiserror::Error;
 
-use crate::language_directive::{LanguageDirectiveExtractError, extract_language_directives};
+use crate::language_directive::{
+    LanguageDirective, LanguageDirectiveExtractError, LanguageDirectiveKind, LanguageDirectiveName,
+    extract_language_directives,
+};
 use crate::language_script_entries::{
     LanguageScriptEntries, LanguageScriptEntriesError, build_language_script_entries,
 };
 use crate::language_script_info::{
     LanguageScriptInfo, LanguageScriptInfoError, build_language_script_info,
 };
-use crate::language_ui::{LanguageScriptSyntax, LanguageUiExtractError, extract_language_ui_items};
+use crate::language_ui::{
+    LanguageScriptSyntax, LanguageUiExtractError, SourceSpan, extract_language_ui_items,
+    extract_tra2_language_ui_items,
+};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LanguageScriptFormat {
+    Standard(LanguageScriptSyntax),
+    Tra2,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LogicalScriptLanguage {
@@ -21,6 +33,11 @@ pub enum LogicalScriptLanguageError {
     UiExtract(#[from] LanguageUiExtractError),
     #[error(transparent)]
     DirectiveExtract(#[from] LanguageDirectiveExtractError),
+    #[error(".tra2ではlanguage Tipsを使用できません: {directive:?} {span:?}")]
+    Tra2TipsNotSupported {
+        directive: LanguageDirectiveName,
+        span: SourceSpan,
+    },
     #[error(transparent)]
     ScriptInfo(#[from] LanguageScriptInfoError),
     #[error(transparent)]
@@ -32,12 +49,51 @@ pub fn analyze_logical_script_language(
     body: &str,
     syntax: LanguageScriptSyntax,
 ) -> Result<LogicalScriptLanguage, LogicalScriptLanguageError> {
-    let ui_items = extract_language_ui_items(body, syntax)?;
+    analyze_logical_script_language_with_format(
+        script_name,
+        body,
+        LanguageScriptFormat::Standard(syntax),
+    )
+}
+
+pub(crate) fn analyze_logical_script_language_with_format(
+    script_name: &str,
+    body: &str,
+    format: LanguageScriptFormat,
+) -> Result<LogicalScriptLanguage, LogicalScriptLanguageError> {
+    let ui_items = match format {
+        LanguageScriptFormat::Standard(syntax) => extract_language_ui_items(body, syntax)?,
+        LanguageScriptFormat::Tra2 => extract_tra2_language_ui_items(body),
+    };
     let directives = extract_language_directives(body)?;
+    if format == LanguageScriptFormat::Tra2 {
+        validate_tra2_directives(&directives)?;
+    }
     let info = build_language_script_info(script_name, ui_items, directives)?;
     let entries = build_language_script_entries(&info)?;
 
     Ok(LogicalScriptLanguage { info, entries })
+}
+
+fn validate_tra2_directives(
+    directives: &[LanguageDirective],
+) -> Result<(), LogicalScriptLanguageError> {
+    for directive in directives {
+        let directive_name = match directive.kind {
+            LanguageDirectiveKind::Tips { .. } => Some(LanguageDirectiveName::Tips),
+            LanguageDirectiveKind::ScriptTips { .. } => Some(LanguageDirectiveName::ScriptTips),
+            LanguageDirectiveKind::Nolang { .. } => None,
+        };
+
+        if let Some(directive_name) = directive_name {
+            return Err(LogicalScriptLanguageError::Tra2TipsNotSupported {
+                directive: directive_name,
+                span: directive.span,
+            });
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -49,6 +105,82 @@ mod tests {
     };
     use crate::language_script_info::{LanguageScriptInfoError, LanguageUiInfoMeta};
     use crate::language_ui::{LanguageUiExtractError, LanguageUiKind, SourceSpan};
+
+    #[test]
+    fn analyzes_tra2_params_exclusively_and_aggregates_duplicate_keys() {
+        let body = concat!(
+            "--track@vx:X速度,-10,10,0\n",
+            "---$nolang:name\n",
+            "--param:非翻訳,1\n",
+            "--param:aaa::周期,0.5\n",
+            "--param:周期,0.5\n",
+            "--param:周期,1.0\n",
+            "--param:空,\n",
+            "--param:チェック/check,0\n",
+            "--param:選択/select/A=0/B=1,0\n",
+        );
+
+        let result = analyze_logical_script_language_with_format(
+            "Transition",
+            body,
+            LanguageScriptFormat::Tra2,
+        )
+        .unwrap();
+
+        assert_eq!(
+            result
+                .info
+                .ui_items
+                .iter()
+                .map(|item| (
+                    item.kind,
+                    item.name.name.original.as_str(),
+                    item.name.enabled
+                ))
+                .collect::<Vec<_>>(),
+            vec![
+                (LanguageUiKind::Param, "非翻訳", false),
+                (LanguageUiKind::Param, "aaa::周期", true),
+                (LanguageUiKind::Param, "周期", true),
+                (LanguageUiKind::Param, "周期", true),
+            ]
+        );
+        assert_eq!(
+            result
+                .entries
+                .text_entries
+                .iter()
+                .map(|entry| (entry.key.as_str(), entry.origins.len()))
+                .collect::<Vec<_>>(),
+            vec![("Transition", 1), ("aaa::周期", 1), ("周期", 2)]
+        );
+    }
+
+    #[test]
+    fn rejects_each_tips_directive_in_tra2() {
+        for (body, expected) in [
+            (
+                "---$tips:Param tips\n--param:周期,0.5\n",
+                LanguageDirectiveName::Tips,
+            ),
+            (
+                "---$script_tips:Script tips\n",
+                LanguageDirectiveName::ScriptTips,
+            ),
+        ] {
+            assert!(matches!(
+                analyze_logical_script_language_with_format(
+                    "Transition",
+                    body,
+                    LanguageScriptFormat::Tra2,
+                ),
+                Err(LogicalScriptLanguageError::Tra2TipsNotSupported {
+                    directive,
+                    ..
+                }) if directive == expected
+            ));
+        }
+    }
 
     #[test]
     fn analyzes_source_language_end_to_end() {

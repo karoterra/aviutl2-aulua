@@ -223,3 +223,58 @@ fn nested_only_check_skips_unscoped_script_content_analysis() {
     assert!(output.stdout.is_empty());
     assert!(output.stderr.is_empty());
 }
+
+#[test]
+fn direct_tra2_check_requires_plain_params_and_reports_ignored_ui_as_unused() {
+    let temp = TempDir::new().unwrap();
+    write_project_file(
+        temp.path(),
+        "aulua.yaml",
+        "scripts:\n  - name: broken.anm2\n    sources:\n      - path: missing.lua\n",
+    );
+    write_project_file(
+        temp.path(),
+        "transition.tra2",
+        concat!(
+            "--track@vx:X速度,-10,10,0\n",
+            "--param:aaa::周期,0.5\n",
+            "--param:周期,0.5\n",
+            "--param:周期,1.0\n",
+            "--param:空初期値,\n",
+            "--param:有効/check,0\n",
+        ),
+    );
+    write_project_file(
+        temp.path(),
+        "target.aul2",
+        concat!(
+            "[transition]\n",
+            "transition=Translated\n",
+            "周期=Translated\n",
+            "X速度=Unused\n",
+            "空初期値=Unused\n",
+            "有効=Unused\n",
+        ),
+    );
+
+    let output = run_aulua(
+        temp.path(),
+        &[
+            "language",
+            "check",
+            "--script",
+            "transition.tra2",
+            "--target",
+            "target.aul2",
+        ],
+    );
+
+    assert_eq!(output.status.code(), Some(1), "{output:?}");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("keyが存在しません: [transition] aaa::周期"));
+    assert!(stdout.contains("使用されていないkeyです: [transition] X速度"));
+    assert!(stdout.contains("使用されていないkeyです: [transition] 空初期値"));
+    assert!(stdout.contains("使用されていないkeyです: [transition] 有効"));
+    assert!(!stdout.contains("keyが存在しません: [transition] 周期\n"));
+    assert!(output.stderr.is_empty());
+}

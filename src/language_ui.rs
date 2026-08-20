@@ -24,6 +24,7 @@ pub struct LanguageUiName {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LanguageUiKind {
+    Param,
     Track,
     Check,
     CheckSection,
@@ -93,6 +94,35 @@ pub fn extract_language_ui_items(
         LanguageScriptSyntax::AuluaSource => extract_source_ui_items(body),
         LanguageScriptSyntax::BuiltScript => extract_built_ui_items(body),
     }
+}
+
+pub(crate) fn extract_tra2_language_ui_items(body: &str) -> Vec<LanguageUiItem> {
+    physical_lines(body)
+        .enumerate()
+        .filter_map(|(line_index, line)| parse_tra2_param(line, line_index + 1))
+        .collect()
+}
+
+fn parse_tra2_param(line: &str, line_number: usize) -> Option<LanguageUiItem> {
+    let parameters = line.strip_prefix("--param:")?;
+    let (name, initial_value) = parameters.split_once(',')?;
+
+    if name.is_empty() || initial_value.is_empty() || name.contains('/') {
+        return None;
+    }
+
+    Some(LanguageUiItem {
+        kind: LanguageUiKind::Param,
+        name: LanguageUiName {
+            original: name.to_string(),
+            translation_key: name.to_string(),
+        },
+        meta: LanguageUiMeta::None,
+        span: SourceSpan {
+            start_line: line_number,
+            end_line: line_number,
+        },
+    })
 }
 
 fn extract_source_ui_items(body: &str) -> Result<Vec<LanguageUiItem>, LanguageUiExtractError> {
@@ -250,7 +280,9 @@ fn parse_built_ui_item(
                 .ok_or(LanguageUiExtractError::InvalidBuiltSyntax { kind, line_number })?;
             (name, LanguageUiMeta::None)
         }
-        LanguageUiKind::Group | LanguageUiKind::Separator => unreachable!(),
+        LanguageUiKind::Param | LanguageUiKind::Group | LanguageUiKind::Separator => {
+            unreachable!()
+        }
     };
 
     Ok(LanguageUiItem {
@@ -424,6 +456,7 @@ fn language_kind_from_name(name: &str) -> Option<LanguageUiKind> {
 
 fn language_kind_name(kind: LanguageUiKind) -> &'static str {
     match kind {
+        LanguageUiKind::Param => "param",
         LanguageUiKind::Track => "track",
         LanguageUiKind::Check => "check",
         LanguageUiKind::CheckSection => "checksection",
@@ -468,6 +501,75 @@ mod tests {
 
     fn extract_built(body: &str) -> Result<Vec<LanguageUiItem>, LanguageUiExtractError> {
         extract_language_ui_items(body, LanguageScriptSyntax::BuiltScript)
+    }
+
+    fn extract_tra2(body: &str) -> Vec<LanguageUiItem> {
+        extract_tra2_language_ui_items(body)
+    }
+
+    #[test]
+    fn extracts_only_plain_tra2_params_with_exact_translation_keys() {
+        let body = concat!(
+            "--param:周期,0.5\n",
+            "--param:aaa::周期,0.5\n",
+            "--param:周期,1.0\n",
+        );
+
+        let items = extract_tra2(body);
+
+        assert_eq!(items.len(), 3);
+        assert!(items.iter().all(|item| item.kind == LanguageUiKind::Param));
+        assert_eq!(items[0].name.original, "周期");
+        assert_eq!(items[0].name.translation_key, "周期");
+        assert_eq!(items[1].name.original, "aaa::周期");
+        assert_eq!(items[1].name.translation_key, "aaa::周期");
+        assert_eq!(
+            items.iter().map(|item| item.span).collect::<Vec<_>>(),
+            vec![
+                SourceSpan {
+                    start_line: 1,
+                    end_line: 1,
+                },
+                SourceSpan {
+                    start_line: 2,
+                    end_line: 2,
+                },
+                SourceSpan {
+                    start_line: 3,
+                    end_line: 3,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn ignores_unsupported_invalid_and_standard_ui_in_tra2() {
+        let body = concat!(
+            "--param:0.5\n",
+            "--param:,0.5\n",
+            "--param:周期,\n",
+            "--param:有効/check,1\n",
+            "--param:種類/select/A=0/B=1,0\n",
+            "--param:未知/other,1\n",
+            " --param:インデント,1\n",
+            "--Param:大文字,1\n",
+            "--track@vx:X速度,-10,10,0\n",
+            "---$track:Y速度\n",
+            "local y = 0\n",
+            "--group:Group\n",
+            "--separator:Separator\n",
+        );
+
+        assert!(extract_tra2(body).is_empty());
+    }
+
+    #[test]
+    fn standard_built_ui_still_extracts_track_and_ignores_param() {
+        let items = extract_built("--param:周期,0.5\n--track@vx:X速度,-10,10,0\n").unwrap();
+
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].kind, LanguageUiKind::Track);
+        assert_eq!(items[0].name.translation_key, "X速度");
     }
 
     #[test]

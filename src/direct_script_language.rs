@@ -7,7 +7,8 @@ use thiserror::Error;
 use crate::direct_script::{DirectScriptError, resolve_direct_script};
 use crate::language_ui::LanguageScriptSyntax;
 use crate::logical_script_language::{
-    LogicalScriptLanguage, LogicalScriptLanguageError, analyze_logical_script_language,
+    LanguageScriptFormat, LogicalScriptLanguage, LogicalScriptLanguageError,
+    analyze_logical_script_language_with_format,
 };
 use crate::text_utils::read_text;
 
@@ -79,6 +80,15 @@ pub(crate) fn analyze_direct_script_file(
             source,
         }
     })?;
+    let format = if direct_script
+        .identity
+        .extension
+        .eq_ignore_ascii_case("tra2")
+    {
+        LanguageScriptFormat::Tra2
+    } else {
+        LanguageScriptFormat::Standard(LanguageScriptSyntax::BuiltScript)
+    };
     let mut analyzed = Vec::with_capacity(direct_script.logical_scripts.len());
 
     for logical_script in direct_script.logical_scripts {
@@ -87,16 +97,13 @@ pub(crate) fn analyze_direct_script_file(
             name: logical_script.name,
             body: logical_script.body.to_owned(),
         };
-        let language = analyze_logical_script_language(
-            &prepared.name,
-            &prepared.body,
-            LanguageScriptSyntax::BuiltScript,
-        )
-        .map_err(|source| AnalyzeDirectScriptFileError::Language {
-            path: prepared.origin_path.clone(),
-            script_name: prepared.name.clone(),
-            source: Box::new(source),
-        })?;
+        let language =
+            analyze_logical_script_language_with_format(&prepared.name, &prepared.body, format)
+                .map_err(|source| AnalyzeDirectScriptFileError::Language {
+                    path: prepared.origin_path.clone(),
+                    script_name: prepared.name.clone(),
+                    source: Box::new(source),
+                })?;
 
         analyzed.push(AnalyzedDirectLogicalScript { prepared, language });
     }
@@ -254,6 +261,63 @@ mod tests {
                     && !script.prepared.body.contains("unknown")
                     && !script.prepared.body.contains("invalid"))
         );
+    }
+
+    #[test]
+    fn analyzes_multiple_tra2_sections_with_param_only_ui() {
+        let temp = TempDir::new().unwrap();
+        let path = temp.path().join("@Basic_S.tra2");
+        write(
+            &path,
+            concat!(
+                "--param:Preamble,1\n",
+                "@First\n",
+                "--track@vx:X速度,-10,10,0\n",
+                "--param:aaa::周期,0.5\n",
+                "--param:周期,0.5\n",
+                "--param:周期,1.0\n",
+                "@Second\n",
+                "--param:デューティ比%,50\n",
+            ),
+        );
+
+        let result = analyze_direct_script_file(&path).unwrap();
+
+        assert_eq!(
+            result
+                .iter()
+                .map(|script| script.prepared.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["First@Basic_S", "Second@Basic_S"]
+        );
+        assert_eq!(
+            result[0]
+                .language
+                .entries
+                .text_entries
+                .iter()
+                .map(|entry| (entry.key.as_str(), entry.origins.len()))
+                .collect::<Vec<_>>(),
+            vec![("First@Basic_S", 1), ("aaa::周期", 1), ("周期", 2)]
+        );
+        assert_eq!(
+            result[1]
+                .language
+                .entries
+                .text_entries
+                .iter()
+                .map(|entry| entry.key.as_str())
+                .collect::<Vec<_>>(),
+            vec!["Second@Basic_S", "デューティ比%"]
+        );
+        assert!(result.iter().all(|script| {
+            !script
+                .language
+                .entries
+                .text_entries
+                .iter()
+                .any(|entry| matches!(entry.key.as_str(), "Preamble" | "X速度"))
+        }));
     }
 
     #[test]

@@ -231,6 +231,9 @@ fn validate_select_option_names(
     info: &LanguageScriptInfo,
 ) -> Result<(), LanguageScriptEntriesError> {
     for ui in &info.ui_items {
+        if ui.kind.is_param() {
+            continue;
+        }
         let LanguageUiInfoMeta::Select { options } = &ui.meta else {
             continue;
         };
@@ -255,7 +258,7 @@ fn validate_select_option_names(
 
 fn validate_effect_name_tips(info: &LanguageScriptInfo) -> Result<(), LanguageScriptEntriesError> {
     for ui in &info.ui_items {
-        if ui.kind == LanguageUiKind::Param {
+        if ui.kind.is_param() {
             continue;
         }
         if ui.name.name.original != "effect.name" {
@@ -401,10 +404,7 @@ fn language_ui_tips_entry(
 }
 
 fn is_standard_value_ui_kind(kind: LanguageUiKind) -> bool {
-    !matches!(
-        kind,
-        LanguageUiKind::Param | LanguageUiKind::Group | LanguageUiKind::Separator
-    )
+    !kind.is_param() && !matches!(kind, LanguageUiKind::Group | LanguageUiKind::Separator)
 }
 
 #[cfg(test)]
@@ -495,8 +495,8 @@ mod tests {
     fn allows_duplicate_params_and_names_shared_with_standard_ui() {
         let model = info(vec![
             ui(LanguageUiKind::Param, "周期", "周期", 1),
-            ui(LanguageUiKind::Param, "周期", "周期", 2),
-            ui(LanguageUiKind::Param, "周期", "周期", 3),
+            ui(LanguageUiKind::ParamCheck, "周期", "周期", 2),
+            ui(LanguageUiKind::ParamSelect, "周期", "周期", 3),
             ui(LanguageUiKind::Track, "周期", "周期", 4),
         ]);
 
@@ -517,13 +517,19 @@ mod tests {
     }
 
     #[test]
-    fn param_does_not_conflict_with_group_state_key() {
-        let model = info(vec![
-            ui(LanguageUiKind::Group, "Settings", "Settings", 1),
-            ui(LanguageUiKind::Param, "Settings.hide", "Settings.hide", 2),
-        ]);
+    fn param_kinds_do_not_conflict_with_group_state_key() {
+        for kind in [
+            LanguageUiKind::Param,
+            LanguageUiKind::ParamCheck,
+            LanguageUiKind::ParamSelect,
+        ] {
+            let model = info(vec![
+                ui(LanguageUiKind::Group, "Settings", "Settings", 1),
+                ui(kind, "Settings.hide", "Settings.hide", 2),
+            ]);
 
-        assert!(build(&model).is_ok());
+            assert!(build(&model).is_ok());
+        }
     }
 
     #[test]
@@ -671,6 +677,36 @@ mod tests {
                 first_option_index: 1,
                 duplicate_option_index: 3,
             }
+        );
+    }
+
+    #[test]
+    fn param_select_allows_and_aggregates_duplicate_option_names() {
+        let mut select = ui(LanguageUiKind::ParamSelect, "種類", "種類", 1);
+        select.meta = LanguageUiInfoMeta::Select {
+            options: vec![
+                LanguageText {
+                    value: "aaa::直線".to_string(),
+                    enabled: true,
+                },
+                LanguageText {
+                    value: "aaa::直線".to_string(),
+                    enabled: true,
+                },
+            ],
+        };
+
+        let entries = build(&info(vec![select])).unwrap().text_entries;
+        let option = entries
+            .iter()
+            .find(|entry| entry.key == "aaa::直線")
+            .unwrap();
+        assert_eq!(option.origins.len(), 2);
+        assert!(
+            option
+                .origins
+                .iter()
+                .all(|origin| matches!(origin, LanguageTextOrigin::SelectOption { .. }))
         );
     }
 

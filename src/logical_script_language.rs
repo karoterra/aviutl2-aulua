@@ -107,7 +107,7 @@ mod tests {
     use crate::language_ui::{LanguageUiExtractError, LanguageUiKind, SourceSpan};
 
     #[test]
-    fn analyzes_tra2_params_exclusively_and_aggregates_duplicate_keys() {
+    fn analyzes_supported_tra2_params_exclusively_and_aggregates_duplicate_keys() {
         let body = concat!(
             "--track@vx:X速度,-10,10,0\n",
             "---$nolang:name\n",
@@ -116,8 +116,10 @@ mod tests {
             "--param:周期,0.5\n",
             "--param:周期,1.0\n",
             "--param:空,\n",
-            "--param:チェック/check,0\n",
-            "--param:選択/select/A=0/B=1,0\n",
+            "--param:aaa::加速/check,0\n",
+            "---$nolang:option:aaa::直線\n",
+            "--param:aaa::種類/select/直線=1/曲線=2/aaa::直線=3,1\n",
+            "--param:不正/select/A=0/B,0\n",
         );
 
         let result = analyze_logical_script_language_with_format(
@@ -143,6 +145,8 @@ mod tests {
                 (LanguageUiKind::Param, "aaa::周期", true),
                 (LanguageUiKind::Param, "周期", true),
                 (LanguageUiKind::Param, "周期", true),
+                (LanguageUiKind::ParamCheck, "aaa::加速", true),
+                (LanguageUiKind::ParamSelect, "aaa::種類", true),
             ]
         );
         assert_eq!(
@@ -152,7 +156,15 @@ mod tests {
                 .iter()
                 .map(|entry| (entry.key.as_str(), entry.origins.len()))
                 .collect::<Vec<_>>(),
-            vec![("Transition", 1), ("aaa::周期", 1), ("周期", 2)]
+            vec![
+                ("Transition", 1),
+                ("aaa::周期", 1),
+                ("周期", 2),
+                ("aaa::加速", 1),
+                ("aaa::種類", 1),
+                ("直線", 1),
+                ("曲線", 1),
+            ]
         );
     }
 

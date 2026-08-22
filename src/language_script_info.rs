@@ -251,10 +251,8 @@ fn apply_pending_to_ui(
     tips: Option<TipsText>,
     nolang: Vec<PendingNolangTarget>,
 ) -> Result<LanguageUiInfo, LanguageScriptInfoError> {
-    if matches!(
-        ui.kind,
-        LanguageUiKind::Param | LanguageUiKind::Group | LanguageUiKind::Separator
-    ) && let Some(tips) = &tips
+    if (ui.kind.is_param() || matches!(ui.kind, LanguageUiKind::Group | LanguageUiKind::Separator))
+        && let Some(tips) = &tips
     {
         return Err(LanguageScriptInfoError::TipsNotSupported {
             kind: ui.kind,
@@ -671,6 +669,48 @@ mod tests {
     }
 
     #[test]
+    fn applies_existing_nolang_targets_to_param_kinds_with_exact_option_names() {
+        let result = build(
+            vec![
+                ui(LanguageUiKind::Param, 2, 2, LanguageUiMeta::None),
+                ui(LanguageUiKind::ParamCheck, 4, 4, LanguageUiMeta::None),
+                ui(
+                    LanguageUiKind::ParamSelect,
+                    6,
+                    6,
+                    LanguageUiMeta::Select {
+                        options: vec!["直線".to_string(), "aaa::直線".to_string()],
+                    },
+                ),
+            ],
+            vec![
+                nolang(vec![NolangTarget::Name], 1),
+                nolang(vec![NolangTarget::Name], 3),
+                nolang(
+                    vec![
+                        NolangTarget::Name,
+                        NolangTarget::Option("aaa::直線".to_string()),
+                    ],
+                    5,
+                ),
+            ],
+        )
+        .unwrap();
+
+        assert!(result.ui_items.iter().all(|item| !item.name.enabled));
+        let LanguageUiInfoMeta::Select { options } = &result.ui_items[2].meta else {
+            panic!("expected select metadata");
+        };
+        assert_eq!(
+            options
+                .iter()
+                .map(|option| option.enabled)
+                .collect::<Vec<_>>(),
+            vec![true, false]
+        );
+    }
+
+    #[test]
     fn normalizes_empty_zero_label_to_none() {
         let result = build(
             vec![ui(
@@ -696,7 +736,7 @@ mod tests {
         let result = build(
             vec![
                 ui(
-                    LanguageUiKind::Select,
+                    LanguageUiKind::ParamSelect,
                     4,
                     5,
                     LanguageUiMeta::Select {
@@ -704,7 +744,7 @@ mod tests {
                     },
                 ),
                 ui(
-                    LanguageUiKind::Select,
+                    LanguageUiKind::ParamSelect,
                     8,
                     9,
                     LanguageUiMeta::Select { options: vec![] },
@@ -880,6 +920,8 @@ mod tests {
     fn unsupported_ui_kinds_reject_tips() {
         for kind in [
             LanguageUiKind::Param,
+            LanguageUiKind::ParamCheck,
+            LanguageUiKind::ParamSelect,
             LanguageUiKind::Group,
             LanguageUiKind::Separator,
         ] {

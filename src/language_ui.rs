@@ -25,6 +25,8 @@ pub struct LanguageUiName {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LanguageUiKind {
     Param,
+    ParamCheck,
+    ParamSelect,
     Track,
     Check,
     CheckSection,
@@ -39,6 +41,12 @@ pub enum LanguageUiKind {
     Value,
     Group,
     Separator,
+}
+
+impl LanguageUiKind {
+    pub(crate) fn is_param(self) -> bool {
+        matches!(self, Self::Param | Self::ParamCheck | Self::ParamSelect)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -105,24 +113,53 @@ pub(crate) fn extract_tra2_language_ui_items(body: &str) -> Vec<LanguageUiItem> 
 
 fn parse_tra2_param(line: &str, line_number: usize) -> Option<LanguageUiItem> {
     let parameters = line.strip_prefix("--param:")?;
-    let (name, initial_value) = parameters.split_once(',')?;
+    let (declaration, initial_value) = parameters.split_once(',')?;
 
-    if name.is_empty() || initial_value.is_empty() || name.contains('/') {
+    if initial_value.is_empty() {
+        return None;
+    }
+
+    let (kind, name, meta) = if let Some(name) = declaration.strip_suffix("/check") {
+        (LanguageUiKind::ParamCheck, name, LanguageUiMeta::None)
+    } else if let Some((name, options)) = declaration.split_once("/select/") {
+        let options = parse_tra2_select_options(options)?;
+        (
+            LanguageUiKind::ParamSelect,
+            name,
+            LanguageUiMeta::Select { options },
+        )
+    } else if declaration.contains('/') {
+        return None;
+    } else {
+        (LanguageUiKind::Param, declaration, LanguageUiMeta::None)
+    };
+
+    if name.is_empty() || name.contains('/') {
         return None;
     }
 
     Some(LanguageUiItem {
-        kind: LanguageUiKind::Param,
+        kind,
         name: LanguageUiName {
             original: name.to_string(),
             translation_key: name.to_string(),
         },
-        meta: LanguageUiMeta::None,
+        meta,
         span: SourceSpan {
             start_line: line_number,
             end_line: line_number,
         },
     })
+}
+
+fn parse_tra2_select_options(options: &str) -> Option<Vec<String>> {
+    options
+        .split('/')
+        .map(|option| {
+            let (name, _) = option.split_once('=')?;
+            (!name.is_empty()).then(|| name.to_string())
+        })
+        .collect()
 }
 
 fn extract_source_ui_items(body: &str) -> Result<Vec<LanguageUiItem>, LanguageUiExtractError> {
@@ -280,9 +317,11 @@ fn parse_built_ui_item(
                 .ok_or(LanguageUiExtractError::InvalidBuiltSyntax { kind, line_number })?;
             (name, LanguageUiMeta::None)
         }
-        LanguageUiKind::Param | LanguageUiKind::Group | LanguageUiKind::Separator => {
-            unreachable!()
-        }
+        LanguageUiKind::Param
+        | LanguageUiKind::ParamCheck
+        | LanguageUiKind::ParamSelect
+        | LanguageUiKind::Group
+        | LanguageUiKind::Separator => unreachable!(),
     };
 
     Ok(LanguageUiItem {
@@ -457,6 +496,8 @@ fn language_kind_from_name(name: &str) -> Option<LanguageUiKind> {
 fn language_kind_name(kind: LanguageUiKind) -> &'static str {
     match kind {
         LanguageUiKind::Param => "param",
+        LanguageUiKind::ParamCheck => "param/check",
+        LanguageUiKind::ParamSelect => "param/select",
         LanguageUiKind::Track => "track",
         LanguageUiKind::Check => "check",
         LanguageUiKind::CheckSection => "checksection",
@@ -508,21 +549,37 @@ mod tests {
     }
 
     #[test]
-    fn extracts_only_plain_tra2_params_with_exact_translation_keys() {
+    fn extracts_supported_tra2_params_with_exact_translation_keys() {
         let body = concat!(
             "--param:周期,0.5\n",
             "--param:aaa::周期,0.5\n",
-            "--param:周期,1.0\n",
+            "--param:aaa::加速/check,0\n",
+            "--param:aaa::種類/select/直線=1/曲線=2/aaa::直線=3,1\n",
         );
 
         let items = extract_tra2(body);
 
-        assert_eq!(items.len(), 3);
-        assert!(items.iter().all(|item| item.kind == LanguageUiKind::Param));
+        assert_eq!(items.len(), 4);
         assert_eq!(items[0].name.original, "周期");
         assert_eq!(items[0].name.translation_key, "周期");
         assert_eq!(items[1].name.original, "aaa::周期");
         assert_eq!(items[1].name.translation_key, "aaa::周期");
+        assert_eq!(items[2].kind, LanguageUiKind::ParamCheck);
+        assert_eq!(items[2].name.original, "aaa::加速");
+        assert_eq!(items[2].name.translation_key, "aaa::加速");
+        assert_eq!(items[3].kind, LanguageUiKind::ParamSelect);
+        assert_eq!(items[3].name.original, "aaa::種類");
+        assert_eq!(items[3].name.translation_key, "aaa::種類");
+        assert_eq!(
+            items[3].meta,
+            LanguageUiMeta::Select {
+                options: vec![
+                    "直線".to_string(),
+                    "曲線".to_string(),
+                    "aaa::直線".to_string(),
+                ]
+            }
+        );
         assert_eq!(
             items.iter().map(|item| item.span).collect::<Vec<_>>(),
             vec![
@@ -538,7 +595,25 @@ mod tests {
                     start_line: 3,
                     end_line: 3,
                 },
+                SourceSpan {
+                    start_line: 4,
+                    end_line: 4,
+                },
             ]
+        );
+    }
+
+    #[test]
+    fn tra2_select_ignores_value_semantics_and_preserves_duplicate_option_names() {
+        let items = extract_tra2("--param:種類/select/同じ=not-a-number/同じ=/複数=x=y,-1\n");
+
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].kind, LanguageUiKind::ParamSelect);
+        assert_eq!(
+            items[0].meta,
+            LanguageUiMeta::Select {
+                options: vec!["同じ".to_string(), "同じ".to_string(), "複数".to_string()]
+            }
         );
     }
 
@@ -548,8 +623,13 @@ mod tests {
             "--param:0.5\n",
             "--param:,0.5\n",
             "--param:周期,\n",
-            "--param:有効/check,1\n",
-            "--param:種類/select/A=0/B=1,0\n",
+            "--param:/check,1\n",
+            "--param:名前/不明/check,1\n",
+            "--param:種類/select,0\n",
+            "--param:種類/select/,0\n",
+            "--param:種類/select/A=0/B,0\n",
+            "--param:種類/select/=0/B=1,0\n",
+            "--param:種類/select/A=0/B=1,\n",
             "--param:未知/other,1\n",
             " --param:インデント,1\n",
             "--Param:大文字,1\n",

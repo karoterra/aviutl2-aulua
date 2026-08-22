@@ -1,0 +1,33 @@
+name: PR Label Check
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - labeled
+      - unlabeled
+
+permissions: {}
+
+jobs:
+  check:
+    name: Require a PR label
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check labels
+        if: >-
+          ${{
+            !contains(github.event.pull_request.labels.*.name, 'breaking-change') &&
+            !contains(github.event.pull_request.labels.*.name, 'feat') &&
+            !contains(github.event.pull_request.labels.*.name, 'fix') &&
+            !contains(github.event.pull_request.labels.*.name, 'docs') &&
+            !contains(github.event.pull_request.labels.*.name, 'chore') &&
+            !contains(github.event.pull_request.labels.*.name, 'ci') &&
+            !contains(github.event.pull_request.labels.*.name, 'dependencies') &&
+            !contains(github.event.pull_request.labels.*.name, 'refactor')
+          }}
+        run: |
+          echo "::error title=Missing PR label::Add at least one PR label: breaking-change, feat, fix, docs, chore, ci, dependencies, or refactor. The bug and enhancement labels are for issues and do not satisfy this check."
+          exit 1

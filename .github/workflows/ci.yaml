@@ -43,3 +43,23 @@ jobs:
           mkdir tmp
           cargo run --release -- schema -o ./tmp/aulua.schema.json
           git diff --no-index --exit-code ./schema/aulua.schema.json ./tmp/aulua.schema.json
+
+  docs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v6
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Setup mdBook
+        uses: jdx/mise-action@v4
+        with:
+          install_args: github:rust-lang/mdBook
+
+      - name: Check documentation
+        run: mise run docs:check

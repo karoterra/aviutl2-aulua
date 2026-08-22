@@ -225,7 +225,7 @@ fn nested_only_check_skips_unscoped_script_content_analysis() {
 }
 
 #[test]
-fn direct_tra2_check_requires_plain_params_and_reports_ignored_ui_as_unused() {
+fn direct_tra2_check_requires_supported_params_and_reports_ignored_ui_as_unused() {
     let temp = TempDir::new().unwrap();
     write_project_file(
         temp.path(),
@@ -241,7 +241,8 @@ fn direct_tra2_check_requires_plain_params_and_reports_ignored_ui_as_unused() {
             "--param:周期,0.5\n",
             "--param:周期,1.0\n",
             "--param:空初期値,\n",
-            "--param:有効/check,0\n",
+            "--param:aaa::加速/check,0\n",
+            "--param:aaa::種類/select/直線=1/曲線=2/aaa::直線=3,1\n",
         ),
     );
     write_project_file(
@@ -251,9 +252,11 @@ fn direct_tra2_check_requires_plain_params_and_reports_ignored_ui_as_unused() {
             "[transition]\n",
             "transition=Translated\n",
             "周期=Translated\n",
+            "aaa::加速=Translated\n",
+            "aaa::種類=Translated\n",
+            "直線=Translated\n",
             "X速度=Unused\n",
             "空初期値=Unused\n",
-            "有効=Unused\n",
         ),
     );
 
@@ -272,9 +275,13 @@ fn direct_tra2_check_requires_plain_params_and_reports_ignored_ui_as_unused() {
     assert_eq!(output.status.code(), Some(1), "{output:?}");
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(stdout.contains("keyが存在しません: [transition] aaa::周期"));
+    assert!(stdout.contains("keyが存在しません: [transition] 曲線"));
+    assert!(stdout.contains("keyが存在しません: [transition] aaa::直線"));
     assert!(stdout.contains("使用されていないkeyです: [transition] X速度"));
     assert!(stdout.contains("使用されていないkeyです: [transition] 空初期値"));
-    assert!(stdout.contains("使用されていないkeyです: [transition] 有効"));
+    assert!(!stdout.contains("使用されていないkeyです: [transition] aaa::加速"));
+    assert!(!stdout.contains("使用されていないkeyです: [transition] aaa::種類"));
+    assert!(!stdout.contains("使用されていないkeyです: [transition] 直線"));
     assert!(!stdout.contains("keyが存在しません: [transition] 周期\n"));
     assert!(output.stderr.is_empty());
 }

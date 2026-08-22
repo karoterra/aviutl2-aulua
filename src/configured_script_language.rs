@@ -424,6 +424,8 @@ mod tests {
                 "--param:aaa::周期,0.5\n",
                 "--param:周期,0.5\n",
                 "--param:周期,1.0\n",
+                "--param:aaa::加速/check,0\n",
+                "--param:aaa::種類/select/直線=1/曲線=2/aaa::直線=3,1\n",
             ),
         );
         write(&second_path, "--param:デューティ比%,50\n");
@@ -453,7 +455,16 @@ mod tests {
                 .iter()
                 .map(|entry| (entry.key.as_str(), entry.origins.len()))
                 .collect::<Vec<_>>(),
-            vec![("First@container", 1), ("aaa::周期", 1), ("周期", 2),]
+            vec![
+                ("First@container", 1),
+                ("aaa::周期", 1),
+                ("周期", 2),
+                ("aaa::加速", 1),
+                ("aaa::種類", 1),
+                ("直線", 1),
+                ("曲線", 1),
+                ("aaa::直線", 1),
+            ]
         );
         assert_eq!(
             result[1]

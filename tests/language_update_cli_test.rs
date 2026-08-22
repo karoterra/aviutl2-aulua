@@ -266,7 +266,7 @@ fn scoped_prune_does_not_manage_sections_from_other_scripts() {
 }
 
 #[test]
-fn direct_tra2_update_outputs_only_plain_param_names() {
+fn direct_tra2_update_outputs_supported_param_names_and_options() {
     let temp = TempDir::new().unwrap();
     write_project_file(
         temp.path(),
@@ -309,10 +309,15 @@ fn direct_tra2_update_outputs_only_plain_param_names() {
         concat!(
             "[コマ落ち反復@Basic_S]\n",
             "コマ落ち反復@Basic_S=\n",
+            "周期の単位=\n",
+            "秒=\n",
+            "フレーム=\n",
+            "Hz=\n",
             "aaa::周期=\n",
             "周期=\n",
             "周期(分母)=\n",
             "周期ずれ%=\n",
+            "有効=\n",
             "デューティ比%=\n",
         )
     );

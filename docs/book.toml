@@ -12,4 +12,4 @@ additional-css = ["theme/codeblock-title.css"]
 [output.markdown]
 
 [preprocessor.codeblock-title]
-command = "cargo run --quiet --manifest-path ../tools/mdbook-codeblock-title/Cargo.toml --"
+command = "cargo run --quiet --locked --manifest-path ../tools/mdbook-codeblock-title/Cargo.toml --"

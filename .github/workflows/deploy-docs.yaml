@@ -24,17 +24,16 @@ jobs:
         with:
           toolchain: stable
 
-      - name: Install mdBook (cargo)
-        run: cargo install --locked mdbook@0.5.3
+      - name: Setup mdBook
+        uses: jdx/mise-action@v4
+        with:
+          install_args: github:rust-lang/mdBook
 
       - name: Check mdBook version
         run: mdbook --version
 
-      - name: Build custom preprocessor
-        run: cargo build --manifest-path ./tools/mdbook-codeblock-title/Cargo.toml
-
       - name: Build the book
-        run: mdbook build ./docs
+        run: mise run docs:build
 
       - name: Setup Pages
         uses: actions/configure-pages@v6

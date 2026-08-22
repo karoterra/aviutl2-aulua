@@ -6,4 +6,4 @@
 - [インクルード](include.md)
 - [変数展開](variables.md)
 - [UI設定](ui.md)
-- [モジュール埋め込み](build/embed.md)
+- [モジュール埋め込み](embed.md)

@@ -1,10 +1,26 @@
 [tools]
 "github:EmbarkStudios/cargo-about" = "latest"
+"github:rust-lang/mdBook" = "latest"
 "github:russellbanks/Komac" = "latest"
 "cargo:cargo-edit" = "latest"
 
 [settings]
 lockfile = true
+
+[tasks."docs:build"]
+description = "Build the documentation"
+run = "mdbook build ./docs"
+
+[tasks."docs:serve"]
+description = "Serve the documentation locally"
+run = "mdbook serve ./docs"
+
+[tasks."docs:check"]
+description = "Test the custom preprocessor and build the documentation"
+run = [
+    "cargo test --locked --manifest-path ./tools/mdbook-codeblock-title/Cargo.toml",
+    { task = "docs:build" },
+]
 
 [tasks.release]
 description = "Prepare a release commit and annotated tag without pushing"
